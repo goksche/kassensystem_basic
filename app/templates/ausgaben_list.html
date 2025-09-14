@@ -1,0 +1,55 @@
+<!-- kassensystem_basic/app/templates/ausgaben_list.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Ausgaben</h2>
+
+<form method="get" class="mb-3 flex items-center gap-2">
+  <label class="text-sm text-gray-600">Von</label>
+  <input type="date" name="from" value="{{ date_from }}" class="border rounded-lg px-3 py-2">
+  <label class="text-sm text-gray-600">Bis</label>
+  <input type="date" name="to" value="{{ date_to }}" class="border rounded-lg px-3 py-2">
+  <button class="px-3 py-2 rounded-lg border">Filtern</button>
+  <a href="/ui/ausgaben/new" class="ml-auto px-3 py-2 rounded-lg bg-gray-900 text-white">Neu</a>
+</form>
+
+<div class="bg-white border rounded-2xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50">
+      <tr>
+        <th class="text-left p-2">Datum</th>
+        <th class="text-left p-2">Kategorie</th>
+        <th class="text-right p-2">Betrag</th>
+        <th class="text-left p-2">Zahlart</th>
+        <th class="text-left p-2">Belegt</th>
+        <th class="text-right p-2">Aktion</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for a in rows %}
+      <tr class="border-t">
+        <td class="p-2">{{ a.datum }}</td>
+        <td class="p-2">{{ a.kategorie or '-' }}</td>
+        <td class="p-2 text-right">CHF {{ "%.2f"|format(a.betrag) }}</td>
+        <td class="p-2">{{ a.zahlart }}</td>
+        <td class="p-2">{{ 'Ja' if a.belegt else 'Nein' }}</td>
+        <td class="p-2 text-right">
+          <a href="/ui/ausgaben/{{ a.id }}/edit" class="px-2 py-1 rounded border text-xs">Bearbeiten</a>
+          {% if role in ['Admin','Owner'] %}
+          <form action="/ui/ausgaben/{{ a.id }}/delete" method="post" class="inline" onsubmit="return confirm('Wirklich löschen?')">
+            <button class="px-2 py-1 rounded border text-xs ml-1">Löschen</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    {% if rows|length == 0 %}
+      <tr><td class="p-3 text-sm text-gray-500" colspan="6">Keine Ausgaben im Zeitraum.</td></tr>
+    {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="mt-3 text-right text-sm">
+  <span class="text-gray-600">Total:</span> <span class="font-semibold">CHF {{ "%.2f"|format(total) }}</span>
+</div>
+{% endblock %}

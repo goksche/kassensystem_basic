@@ -1,0 +1,43 @@
+<!-- kassensystem_basic/app/templates/kunden_form.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Kunde anlegen</h2>
+
+<form method="post" action="/ui/kunden/new" class="max-w-xl bg-white border rounded-2xl p-4 space-y-3">
+  <div>
+    <label class="block text-sm text-gray-600 mb-1">Name *</label>
+    <input name="name" required class="w-full border rounded-lg px-3 py-2">
+  </div>
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">Telefon</label>
+      <input name="telefon" class="w-full border rounded-lg px-3 py-2">
+    </div>
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">E-Mail</label>
+      <input name="email" type="email" class="w-full border rounded-lg px-3 py-2">
+    </div>
+  </div>
+  <div>
+    <label class="block text-sm text-gray-600 mb-1">Bemerkungen</label>
+    <textarea name="bemerkungen" class="w-full border rounded-lg px-3 py-2" rows="3"></textarea>
+  </div>
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">Status</label>
+      <select name="status" class="w-full border rounded-lg px-3 py-2">
+        <option value="aktiv">aktiv</option>
+        <option value="inaktiv">inaktiv</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">Punkte</label>
+      <input name="punkte" type="number" min="0" step="1" value="0" class="w-full border rounded-lg px-3 py-2">
+    </div>
+  </div>
+  <div class="pt-2 flex gap-2">
+    <button class="px-4 py-2 rounded-lg bg-gray-900 text-white">Speichern</button>
+    <a href="/ui/kunden" class="px-4 py-2 rounded-lg border">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

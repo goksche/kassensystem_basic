@@ -1,0 +1,167 @@
+<!-- kassensystem_basic/app/templates/abschluss.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Tagesabschluss</h2>
+
+<div class="flex items-center gap-3 mb-4">
+  <label for="date" class="text-sm text-gray-600">Datum</label>
+  <input id="date" type="date" value="{{ date_str }}" class="border rounded-lg px-3 py-2">
+  <button id="btn-refresh" class="px-3 py-2 rounded-lg border">Aktualisieren</button>
+  <a id="btn-export" href="/ui/abschluss/export?date={{ date_str }}" class="ml-auto px-3 py-2 rounded-lg border">CSV Export</a>
+</div>
+
+<div id="panel" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <!-- Zahlungen -->
+  <section class="bg-white border rounded-2xl p-4">
+    <h3 class="font-semibold mb-2">Zahlungen</h3>
+    <div class="space-y-1 text-sm">
+      <div class="flex justify-between"><span>Bar</span><span id="p-bar">CHF 0.00</span></div>
+      <div class="flex justify-between"><span>Karte</span><span id="p-karte">CHF 0.00</span></div>
+      <div class="flex justify-between"><span>TWINT</span><span id="p-twint">CHF 0.00</span></div>
+      <div class="flex justify-between"><span>Rechnung</span><span id="p-rechnung">CHF 0.00</span></div>
+    </div>
+    <div class="mt-3 text-sm">
+      <div class="flex justify-between"><span>Trinkgeld</span><span id="p-tip">CHF 0.00</span></div>
+      <div class="flex justify-between"><span>Belege (Anzahl)</span><span id="p-count">0</span></div>
+      <div class="flex justify-between"><span>Umsatz Brutto</span><span id="p-brutto" class="font-medium">CHF 0.00</span></div>
+    </div>
+  </section>
+
+  <!-- Kassenbuch -->
+  <section class="bg-white border rounded-2xl p-4">
+    <h3 class="font-semibold mb-2">Kassenbuch (Bar-Kasse)</h3>
+    <div class="text-sm space-y-2">
+      <div class="flex items-center justify-between">
+        <label>Startfloat</label>
+        <div class="flex items-center gap-2">
+          <input id="kb-start" type="number" step="0.05" min="0" class="w-28 border rounded-lg px-2 py-1 text-right">
+          <button id="kb-set-start" class="px-3 py-1.5 rounded-lg border">OK</button>
+        </div>
+      </div>
+      <div class="flex items-center justify-between">
+        <label>Einlage</label>
+        <div class="flex items-center gap-2">
+          <input id="kb-einlage" type="number" step="0.05" min="0" class="w-28 border rounded-lg px-2 py-1 text-right">
+          <button id="kb-add-einlage" class="px-3 py-1.5 rounded-lg border">Hinzufügen</button>
+        </div>
+      </div>
+      <div class="flex items-center justify-between">
+        <label>Entnahme</label>
+        <div class="flex items-center gap-2">
+          <input id="kb-entnahme" type="number" step="0.05" min="0" class="w-28 border rounded-lg px-2 py-1 text-right">
+          <button id="kb-add-entnahme" class="px-3 py-1.5 rounded-lg border">Hinzufügen</button>
+        </div>
+      </div>
+      <div class="border-t pt-2">
+        <div class="flex justify-between"><span>Bar SOLL</span><span id="kb-soll" class="font-medium">CHF 0.00</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Finalisieren & Ausgaben -->
+  <section class="bg-white border rounded-2xl p-4">
+    <h3 class="font-semibold mb-2">Abschluss</h3>
+    <div class="text-sm space-y-2">
+      <div class="flex items-center justify-between">
+        <label>Bar IST (gezählt)</label>
+        <input id="kb-ist" type="number" step="0.05" min="0" class="w-32 border rounded-lg px-2 py-1 text-right">
+      </div>
+      <div class="flex items-center justify-between">
+        <span>Differenz</span>
+        <span id="kb-diff" class="font-semibold">CHF 0.00</span>
+      </div>
+      <div class="pt-2">
+        <button id="btn-finalize" class="px-4 py-2 rounded-lg bg-gray-900 text-white">Abschluss speichern</button>
+        <div id="finalized-badge" class="hidden mt-2 text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700 inline-block">Bereits abgeschlossen</div>
+      </div>
+      <div class="border-t mt-4 pt-3">
+        <h4 class="font-semibold mb-1">Ausgaben (heute)</h4>
+        <div class="space-y-1">
+          <div class="flex justify-between"><span>Bar</span><span id="a-bar">CHF 0.00</span></div>
+          <div class="flex justify-between"><span>Karte</span><span id="a-karte">CHF 0.00</span></div>
+          <div class="flex justify-between"><span>TWINT</span><span id="a-twint">CHF 0.00</span></div>
+          <div class="flex justify-between"><span>Rechnung</span><span id="a-rechnung">CHF 0.00</span></div>
+          <div class="flex justify-between font-semibold"><span>Total</span><span id="a-total">CHF 0.00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+function fmtCHF(x){ return 'CHF ' + Number(x || 0).toFixed(2); }
+const dateInput = document.getElementById('date');
+const btnRefresh = document.getElementById('btn-refresh');
+const btnExport = document.getElementById('btn-export');
+
+async function loadPreview(){
+  const d = dateInput.value;
+  const res = await fetch('/api/abschluss/preview?date=' + encodeURIComponent(d));
+  const data = await res.json();
+
+  document.getElementById('p-bar').innerText = fmtCHF(data.payments.bar);
+  document.getElementById('p-karte').innerText = fmtCHF(data.payments.karte);
+  document.getElementById('p-twint').innerText = fmtCHF(data.payments.twint);
+  document.getElementById('p-rechnung').innerText = fmtCHF(data.payments.rechnung);
+  document.getElementById('p-tip').innerText = fmtCHF(data.belege.trinkgeld);
+  document.getElementById('p-count').innerText = data.belege.anzahl;
+  document.getElementById('p-brutto').innerText = fmtCHF(data.belege.summe_brutto);
+
+  document.getElementById('a-bar').innerText = fmtCHF(data.ausgaben.bar);
+  document.getElementById('a-karte').innerText = fmtCHF(data.ausgaben.karte);
+  document.getElementById('a-twint').innerText = fmtCHF(data.ausgaben.twint);
+  document.getElementById('a-rechnung').innerText = fmtCHF(data.ausgaben.rechnung);
+  document.getElementById('a-total').innerText = fmtCHF(data.ausgaben.total);
+
+  document.getElementById('kb-start').value = (data.kassenbuch.startfloat || 0).toFixed(2);
+  document.getElementById('kb-soll').innerText = fmtCHF(data.kassenbuch.bar_soll);
+  document.getElementById('kb-ist').value = data.kassenbuch.bar_ist != null ? data.kassenbuch.bar_ist.toFixed(2) : '';
+  document.getElementById('kb-diff').innerText = data.kassenbuch.differenz != null ? fmtCHF(data.kassenbuch.differenz) : 'CHF 0.00';
+
+  const badge = document.getElementById('finalized-badge');
+  if (data.finalized) badge.classList.remove('hidden'); else badge.classList.add('hidden');
+
+  btnExport.href = '/ui/abschluss/export?date=' + encodeURIComponent(d);
+}
+btnRefresh.onclick = loadPreview;
+dateInput.addEventListener('change', loadPreview);
+
+document.getElementById('kb-set-start').onclick = async () => {
+  const d = dateInput.value;
+  const amount = parseFloat(document.getElementById('kb-start').value || '0');
+  await fetch('/api/abschluss/kassenbuch/set_startfloat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({date: d, amount})});
+  await loadPreview();
+};
+document.getElementById('kb-add-einlage').onclick = async () => {
+  const d = dateInput.value;
+  const amount = parseFloat(document.getElementById('kb-einlage').value || '0');
+  if (amount <= 0) return;
+  await fetch('/api/abschluss/kassenbuch/add_entry', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({date: d, kind:'einlage', amount})});
+  document.getElementById('kb-einlage').value='';
+  await loadPreview();
+};
+document.getElementById('kb-add-entnahme').onclick = async () => {
+  const d = dateInput.value;
+  const amount = parseFloat(document.getElementById('kb-entnahme').value || '0');
+  if (amount <= 0) return;
+  await fetch('/api/abschluss/kassenbuch/add_entry', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({date: d, kind:'entnahme', amount})});
+  document.getElementById('kb-entnahme').value='';
+  await loadPreview();
+};
+
+document.getElementById('btn-finalize').onclick = async () => {
+  const d = dateInput.value;
+  const bar_ist = parseFloat(document.getElementById('kb-ist').value || '0');
+  const res = await fetch('/api/abschluss/finalize', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({date: d, bar_ist})});
+  if (!res.ok){
+    const e = await res.json().catch(()=>({detail:'Fehler'}));
+    alert(e.detail || 'Fehler beim Abschluss');
+    return;
+  }
+  await loadPreview();
+  alert('Abschluss gespeichert.');
+};
+
+loadPreview();
+</script>
+{% endblock %}

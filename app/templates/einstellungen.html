@@ -1,0 +1,92 @@
+<!-- kassensystem_basic/app/templates/einstellungen.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Einstellungen</h2>
+
+<form method="post" action="/ui/einstellungen/save" class="space-y-6">
+  <!-- Zahlarten -->
+  <section class="bg-white border rounded-2xl p-4">
+    <div class="flex items-center justify-between mb-2">
+      <h3 class="font-semibold">Zahlarten</h3>
+      <span class="text-xs text-gray-500">aktiv/inaktiv</span>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+      {% set active = payments or [] %}
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="pay_bar" value="1" {% if 'bar' in active %}checked{% endif %}> Bar
+      </label>
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="pay_karte" value="1" {% if 'karte' in active %}checked{% endif %}> Karte
+      </label>
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="pay_twint" value="1" {% if 'twint' in active %}checked{% endif %}> TWINT
+      </label>
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="pay_rechnung" value="1" {% if 'rechnung' in active %}checked{% endif %}> Rechnung
+      </label>
+    </div>
+  </section>
+
+  <!-- Steuern -->
+  <section class="bg-white border rounded-2xl p-4">
+    <div class="flex items-center justify-between mb-2">
+      <h3 class="font-semibold">Mehrwertsteuer (JSON)</h3>
+      <span class="text-xs text-gray-500">Beispiel: {"CH-7.7": 0.077, "CH-2.6": 0.026}</span>
+    </div>
+    <textarea name="taxes_json" rows="6" class="w-full border rounded-lg px-3 py-2 font-mono text-sm">{{ taxes_json }}</textarea>
+  </section>
+
+  <!-- DEV-spezifisch -->
+  {% if dev %}
+  <section class="bg-white border rounded-2xl p-4">
+    <h3 class="font-semibold mb-2">DEV: Navigation</h3>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
+      {% set current = current_nav | map(attribute='href') | list %}
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="nav_dashboard" value="1" {% if '/ui/dashboard' in current %}checked{% endif %}> Dashboard
+      </label>
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="nav_pos" value="1" {% if '/ui/pos' in current %}checked{% endif %}> Kasse
+      </label>
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="nav_kalender" value="1" {% if '/ui/kalender' in current %}checked{% endif %}> Kalender
+      </label>
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="nav_kunden" value="1" {% if '/ui/kunden' in current %}checked{% endif %}> Kunden
+      </label>
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="nav_katalog" value="1" {% if '/ui/katalog' in current %}checked{% endif %}> Katalog
+      </label>
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="nav_berichte" value="1" {% if '/ui/berichte' in current %}checked{% endif %}> Berichte
+      </label>
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="nav_abschluss" value="1" {% if '/ui/abschluss' in current %}checked{% endif %}> Abschluss
+      </label>
+      <label class="flex items-center gap-2 border rounded-lg p-2">
+        <input type="checkbox" name="nav_settings" value="1" {% if '/ui/einstellungen' in current %}checked{% endif %}> Einstellungen
+      </label>
+    </div>
+  </section>
+
+  <section class="bg-white border rounded-2xl p-4">
+    <h3 class="font-semibold mb-2">DEV: Dashboard-Kacheln</h3>
+    <p class="text-xs text-gray-500 mb-2">Die verfügbaren Flags werden dynamisch aus deinem Dashboard gelesen.</p>
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+      {% for key, val in current_flags.items() %}
+        <label class="flex items-center gap-2 border rounded-lg p-2">
+          <input type="checkbox" name="flag_{{ key }}" value="1" {% if val %}checked{% endif %}> {{ key }}
+        </label>
+      {% endfor %}
+      {% if current_flags|length == 0 %}
+        <div class="text-sm text-gray-500">Keine Flags gefunden.</div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="pt-2">
+    <button class="px-4 py-2 rounded-lg bg-gray-900 text-white">Speichern</button>
+  </div>
+</form>
+{% endblock %}

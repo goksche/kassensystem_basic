@@ -1,0 +1,69 @@
+<!-- kassensystem_basic/app/templates/kalender.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Kalender</h2>
+
+<form class="mb-3 flex items-center gap-2">
+  <label class="text-sm text-gray-600">Datum</label>
+  <input id="date" type="date" value="{{ date_str }}" class="border rounded-lg px-3 py-2">
+  <a href="/ui/termin/new" class="ml-auto px-3 py-2 rounded-lg bg-gray-900 text-white">Neuer Termin</a>
+</form>
+
+<div id="kalender" class="bg-white border rounded-2xl p-4">
+  <div id="list" class="space-y-2"></div>
+</div>
+
+<script>
+function fmt(t){ const d=new Date(t); return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+const dateInput = document.getElementById('date');
+const list = document.getElementById('list');
+
+async function loadDay(){
+  const d = dateInput.value;
+  const res = await fetch('/api/termine/day?date=' + encodeURIComponent(d));
+  const items = await res.json();
+  list.innerHTML = '';
+  if (!items.length){
+    list.innerHTML = '<div class="text-sm text-gray-500">Keine Termine.</div>';
+    return;
+  }
+  // gruppieren nach Mitarbeiter
+  const byStaff = {};
+  for (const it of items){
+    const key = it.mitarbeiter || '—';
+    byStaff[key] = byStaff[key] || [];
+    byStaff[key].push(it);
+  }
+  Object.keys(byStaff).sort().forEach(staff=>{
+    const sec = document.createElement('section');
+    sec.innerHTML = `<h3 class="font-semibold mb-1">${staff}</h3>`;
+    byStaff[staff].forEach(it=>{
+      const row = document.createElement('div');
+      const svc = (it.services || []).join(', ');
+      row.className = 'flex items-center justify-between border rounded-xl p-2';
+      row.innerHTML = `
+        <div>
+          <div class="font-medium">${fmt(it.start)}–${it.ende ? fmt(it.ende) : ''} • ${it.kunde || 'ohne Kunde'}</div>
+          <div class="text-xs text-gray-500">${svc}</div>
+          <div class="text-xs">${it.zustand}</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="/ui/termin/${it.id}/edit" class="px-2 py-1 rounded border text-xs">Bearbeiten</a>
+          <form action="/ui/termin/${it.id}/status" method="post" onsubmit="return confirm('Als erledigt markieren?')" class="inline">
+            <input type="hidden" name="zustand" value="erledigt">
+            <button class="px-2 py-1 rounded border text-xs">Erledigt</button>
+          </form>
+          <form action="/ui/termin/${it.id}/status" method="post" onsubmit="return confirm('Als No-Show markieren?')" class="inline">
+            <input type="hidden" name="zustand" value="no-show">
+            <button class="px-2 py-1 rounded border text-xs">No-Show</button>
+          </form>
+        </div>`;
+      sec.appendChild(row);
+    });
+    list.appendChild(sec);
+  });
+}
+dateInput.addEventListener('change', loadDay);
+loadDay();
+</script>
+{% endblock %}

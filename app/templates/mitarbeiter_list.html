@@ -1,0 +1,35 @@
+<!-- kassensystem_basic/app/templates/mitarbeiter_list.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Mitarbeiter</h2>
+
+<div class="mb-3">
+  <a href="/ui/mitarbeiter/new" class="px-3 py-2 rounded-lg bg-gray-900 text-white">Neu</a>
+</div>
+
+<div class="bg-white border rounded-2xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50">
+      <tr>
+        <th class="text-left p-2">Name</th>
+        <th class="text-left p-2">Rollen (Text)</th>
+        <th class="text-right p-2">Aktion</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for m in staff %}
+      <tr class="border-t">
+        <td class="p-2">{{ m.name }}</td>
+        <td class="p-2">{{ m.rollen or '-' }}</td>
+        <td class="p-2 text-right">
+          <a href="/ui/mitarbeiter/{{ m.id }}/edit" class="px-2 py-1 rounded border text-xs">Bearbeiten</a>
+        </td>
+      </tr>
+    {% endfor %}
+    {% if staff|length == 0 %}
+      <tr><td class="p-3 text-sm text-gray-500" colspan="3">Noch keine Mitarbeiter erfasst.</td></tr>
+    {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

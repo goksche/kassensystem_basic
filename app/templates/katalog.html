@@ -1,0 +1,101 @@
+<!-- kassensystem_basic/app/templates/katalog.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Katalog</h2>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <!-- Services -->
+  <section class="bg-white border rounded-2xl p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold">Services</h3>
+      {% if can_edit %}
+      <a href="/ui/katalog/service/new" class="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-sm">Neu</a>
+      {% endif %}
+    </div>
+    <div class="border rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="text-left p-2">Name</th>
+            <th class="text-right p-2">Dauer</th>
+            <th class="text-right p-2">Preis</th>
+            <th class="text-right p-2">Steuer</th>
+            <th class="text-right p-2">Aktiv</th>
+            {% if can_edit %}<th class="text-right p-2">Aktion</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+        {% for s in services %}
+          <tr class="border-t">
+            <td class="p-2">{{ s.name }}</td>
+            <td class="p-2 text-right">{{ s.dauer_min }} min</td>
+            <td class="p-2 text-right">CHF {{ "%.2f"|format(s.basispreis) }}</td>
+            <td class="p-2 text-right">{{ s.steuer_code }}</td>
+            <td class="p-2 text-right">{{ 'Ja' if s.aktiv else 'Nein' }}</td>
+            {% if can_edit %}
+            <td class="p-2 text-right">
+              <a href="/ui/katalog/service/{{ s.id }}/edit" class="px-2 py-1 rounded border text-xs">Bearbeiten</a>
+              <form action="/ui/katalog/service/{{ s.id }}/toggle" method="post" class="inline">
+                <button class="px-2 py-1 rounded border text-xs ml-1">{{ 'Inaktiv' if s.aktiv else 'Aktiv' }}</button>
+              </form>
+            </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+        {% if services|length == 0 %}
+          <tr><td class="p-3 text-sm text-gray-500" colspan="6">Keine Services erfasst.</td></tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Produkte -->
+  <section class="bg-white border rounded-2xl p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold">Produkte</h3>
+      {% if can_edit %}
+      <a href="/ui/katalog/produkt/new" class="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-sm">Neu</a>
+      {% endif %}
+    </div>
+    <div class="border rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="text-left p-2">Name</th>
+            <th class="text-right p-2">VK</th>
+            <th class="text-right p-2">EK</th>
+            <th class="text-right p-2">Steuer</th>
+            <th class="text-right p-2">Lager</th>
+            <th class="text-right p-2">Aktiv</th>
+            {% if can_edit %}<th class="text-right p-2">Aktion</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+        {% for p in produkte %}
+          <tr class="border-t">
+            <td class="p-2">{{ p.name }}</td>
+            <td class="p-2 text-right">CHF {{ "%.2f"|format(p.verkaufspreis) }}</td>
+            <td class="p-2 text-right">{% if p.einkaufspreis is not none %}CHF {{ "%.2f"|format(p.einkaufspreis) }}{% else %}-{% endif %}</td>
+            <td class="p-2 text-right">{{ p.steuer_code }}</td>
+            <td class="p-2 text-right">{{ p.lagerbestand if p.lagerbestand is not none else '-' }}</td>
+            <td class="p-2 text-right">{{ 'Ja' if p.aktiv else 'Nein' }}</td>
+            {% if can_edit %}
+            <td class="p-2 text-right">
+              <a href="/ui/katalog/produkt/{{ p.id }}/edit" class="px-2 py-1 rounded border text-xs">Bearbeiten</a>
+              <form action="/ui/katalog/produkt/{{ p.id }}/toggle" method="post" class="inline">
+                <button class="px-2 py-1 rounded border text-xs ml-1">{{ 'Inaktiv' if p.aktiv else 'Aktiv' }}</button>
+              </form>
+            </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+        {% if produkte|length == 0 %}
+          <tr><td class="p-3 text-sm text-gray-500" colspan="7">Keine Produkte erfasst.</td></tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

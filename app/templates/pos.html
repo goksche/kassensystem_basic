@@ -1,0 +1,253 @@
+<!-- kassensystem_basic/app/templates/pos.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+  <!-- Linke Spalte: Katalog / Suche -->
+  <section class="lg:col-span-4">
+    <div class="bg-white border rounded-2xl p-4">
+      <div class="flex gap-2 mb-3">
+        <button id="tab-services" class="px-3 py-1.5 rounded-lg border bg-gray-900 text-white">Services</button>
+        <button id="tab-produkte" class="px-3 py-1.5 rounded-lg border">Produkte</button>
+      </div>
+      <input id="search" type="text" placeholder="Suchen..." class="w-full border rounded-lg px-3 py-2 mb-3" />
+      <div id="catalog" class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[60vh] overflow-auto"></div>
+    </div>
+  </section>
+
+  <!-- Rechte Spalte: Warenkorb / Zahlung -->
+  <aside class="lg:col-span-8">
+    <div class="bg-white border rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold">Warenkorb</h3>
+        <div class="flex items-center gap-3">
+          <div id="customer-pill" class="text-sm text-gray-600"></div>
+          <div class="relative">
+            <input id="cust-query" type="text" placeholder="Kunde suchen..." class="border rounded-lg px-3 py-1.5 w-56">
+            <div id="cust-results" class="absolute z-10 bg-white border rounded-lg mt-1 w-full max-h-56 overflow-auto hidden"></div>
+          </div>
+          <button id="btn-clear-customer" class="px-3 py-1.5 rounded-lg border">Kunde entfernen</button>
+          <button id="btn-reset" class="px-3 py-1.5 rounded-lg border">Warenkorb leeren</button>
+        </div>
+      </div>
+
+      <div id="cart-items" class="space-y-2 max-h-[40vh] overflow-auto"></div>
+
+      <div class="border-t my-3 pt-3 space-y-2 text-sm">
+        <div class="flex items-center justify-between">
+          <label>Rabatt</label>
+          <div class="flex items-center gap-2">
+            <input id="discount-percent" type="number" class="w-20 border rounded-lg px-2 py-1 text-right" placeholder="%" step="1" min="0">
+            <input id="discount-amount" type="number" class="w-24 border rounded-lg px-2 py-1 text-right" placeholder="CHF" step="0.05" min="0">
+            <button id="btn-apply-discount" class="px-3 py-1.5 rounded-lg border">OK</button>
+          </div>
+        </div>
+        <div class="flex items-center justify-between">
+          <label>Trinkgeld</label>
+          <div class="flex items-center gap-2">
+            <input id="tip" type="number" class="w-24 border rounded-lg px-2 py-1 text-right" placeholder="CHF" step="0.50" min="0">
+            <button id="btn-set-tip" class="px-3 py-1.5 rounded-lg border">OK</button>
+          </div>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Zwischensumme</span><span id="subtotal" class="font-medium">CHF 0.00</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>MWST gesamt</span><span id="tax" class="font-medium">CHF 0.00</span>
+        </div>
+        <div class="flex items-center justify-between text-lg">
+          <span class="font-semibold">Total</span><span id="total" class="font-bold">CHF 0.00</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <button id="btn-split" class="py-3 rounded-xl border hover:shadow-sm">Splitt-Zahlung</button>
+        <button id="btn-invoice" class="py-3 rounded-xl border hover:shadow-sm pay-btn" data-pay="rechnung">Rechnung</button>
+        <button id="btn-pay-cash" class="py-3 rounded-xl bg-gray-900 text-white pay-btn" data-pay="bar">Bar</button>
+        <button id="btn-pay-card" class="py-3 rounded-xl bg-indigo-600 text-white pay-btn" data-pay="karte">Karte</button>
+        <button id="btn-pay-twint" class="py-3 rounded-xl bg-purple-600 text-white pay-btn" data-pay="twint">TWINT</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const catalog = document.getElementById('catalog');
+const search = document.getElementById('search');
+let activeTab = 'services';
+let allItems = [];
+let enabledPayments = ["bar","karte","twint","rechnung"];
+
+function fmtCHF(x){ return 'CHF ' + Number(x).toFixed(2); }
+
+async function loadConfig(){
+  const res = await fetch('/api/config');
+  const cfg = await res.json();
+  enabledPayments = cfg.payments || enabledPayments;
+  // toggle buttons
+  document.querySelectorAll('.pay-btn').forEach(btn => {
+    const kind = btn.dataset.pay;
+    if (!enabledPayments.includes(kind)) {
+      btn.classList.add('hidden');
+    } else {
+      btn.classList.remove('hidden');
+    }
+  });
+}
+
+async function loadCatalog(){
+  const url = activeTab === 'services' ? '/api/katalog/services' : '/api/katalog/produkte';
+  const res = await fetch(url);
+  allItems = await res.json();
+  renderCatalog();
+}
+function renderCatalog(){
+  const q = (search.value || '').toLowerCase();
+  catalog.innerHTML = '';
+  allItems.filter(i => i.name.toLowerCase().includes(q)).forEach(i => {
+    const btn = document.createElement('button');
+    btn.className = 'p-3 border rounded-xl text-left hover:shadow-sm';
+    btn.innerHTML = `
+      <div class="font-medium">${i.name}</div>
+      <div class="text-sm text-gray-500">${activeTab === 'services' ? (i.dauer_min + ' Min') : 'Retail'}</div>
+      <div class="text-sm font-semibold">${fmtCHF(i.preis)}</div>`;
+    btn.onclick = () => addToCart(activeTab === 'services' ? 'service' : 'produkt', i.id, 1);
+    catalog.appendChild(btn);
+  });
+}
+
+async function addToCart(typ, ref_id, qty){
+  await fetch('/api/cart/add_item', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({typ, ref_id, qty})});
+  await refreshCart();
+}
+async function refreshCart(){
+  const res = await fetch('/api/cart/summary');
+  const data = await res.json();
+  renderCart(data);
+}
+function renderCart(data){
+  const container = document.getElementById('cart-items');
+  container.innerHTML = '';
+  (data.items || []).forEach(it => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between border rounded-xl p-2';
+    row.innerHTML = `
+      <div>
+        <div class="font-medium">${it.name}</div>
+        <div class="text-xs text-gray-500">${it.typ} • ${it.steuer_code}</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="number" step="1" min="0" value="${it.qty}" class="w-16 border rounded-lg px-2 py-1 text-right">
+        <div class="w-24 text-right font-semibold">${fmtCHF(it.line_gross)}</div>
+      </div>`;
+    const qtyInput = row.querySelector('input');
+    qtyInput.addEventListener('change', async () => {
+      const v = parseFloat(qtyInput.value || '0');
+      await fetch('/api/cart/update_qty', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({line_id: it.line_id, qty: v})});
+      await refreshCart();
+    });
+    container.appendChild(row);
+  });
+  document.getElementById('subtotal').innerText = fmtCHF(data.subtotal_gross || 0);
+  document.getElementById('tax').innerText = fmtCHF(data.tax_total || 0);
+  document.getElementById('total').innerText = fmtCHF(data.total_gross || 0);
+
+  const pill = document.getElementById('customer-pill');
+  if (data.kunde && data.kunde.id){
+    pill.innerHTML = `<span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Kunde: ${data.kunde.name}</span>`;
+  } else {
+    pill.innerHTML = `<span class="px-2 py-1 rounded-full bg-gray-100 text-gray-600">Kunde: Laufkunde</span>`;
+  }
+}
+
+// Controls Katalog
+document.getElementById('tab-services').onclick = () => { activeTab='services'; document.getElementById('tab-services').classList.add('bg-gray-900','text-white'); document.getElementById('tab-produkte').classList.remove('bg-gray-900','text-white'); loadCatalog(); };
+document.getElementById('tab-produkte').onclick = () => { activeTab='produkte'; document.getElementById('tab-produkte').classList.add('bg-gray-900','text-white'); document.getElementById('tab-services').classList.remove('bg-gray-900','text-white'); loadCatalog(); };
+search.addEventListener('input', renderCatalog);
+
+// Cart Controls
+document.getElementById('btn-reset').onclick = async () => { await fetch('/api/cart/reset', {method:'POST'}); await refreshCart(); };
+document.getElementById('btn-apply-discount').onclick = async () => {
+  const percent = parseFloat(document.getElementById('discount-percent').value || '0');
+  const amount = parseFloat(document.getElementById('discount-amount').value || '0');
+  await fetch('/api/cart/apply_discount', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({percent, amount})});
+  await refreshCart();
+};
+document.getElementById('btn-set-tip').onclick = async () => {
+  const amount = parseFloat(document.getElementById('tip').value || '0');
+  await fetch('/api/cart/set_tip', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({amount})});
+  await refreshCart();
+};
+
+// Kunden-Suche & Auswahl
+const custQuery = document.getElementById('cust-query');
+const custResults = document.getElementById('cust-results');
+custQuery.addEventListener('input', async () => {
+  const q = custQuery.value.trim();
+  if (q.length < 2){ custResults.classList.add('hidden'); custResults.innerHTML=''; return; }
+  const res = await fetch('/api/kunden?q=' + encodeURIComponent(q));
+  const items = await res.json();
+  custResults.innerHTML = '';
+  items.forEach(k => {
+    const row = document.createElement('div');
+    row.className = 'px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm';
+    row.innerHTML = `<div class="font-medium">${k.name}</div><div class="text-xs text-gray-500">${k.telefon || ''} ${k.email ? '• ' + k.email : ''}</div>`;
+    row.onclick = async () => {
+      await fetch('/api/cart/set_customer', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({kunde_id: k.id})});
+      custResults.classList.add('hidden');
+      custQuery.value = '';
+      await refreshCart();
+    };
+    custResults.appendChild(row);
+  });
+  custResults.classList.remove('hidden');
+});
+document.addEventListener('click', (e) => {
+  if (!custResults.contains(e.target) && e.target !== custQuery){
+    custResults.classList.add('hidden');
+  }
+});
+document.getElementById('btn-clear-customer').onclick = async () => {
+  await fetch('/api/cart/set_customer', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({kunde_id: null})});
+  await refreshCart();
+};
+
+// Checkout
+async function doCheckout(payments){
+  const res = await fetch('/api/cart/checkout', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({payments})});
+  if(!res.ok){
+    const e = await res.json().catch(()=>({detail:'Fehler'}));
+    alert(e.detail || 'Fehler beim Checkout');
+    return;
+  }
+  const data = await res.json();
+  window.location.href = `/ui/receipt/${data.beleg_id}`;
+}
+document.getElementById('btn-pay-cash').onclick = async () => {
+  const s = await (await fetch('/api/cart/summary')).json();
+  await doCheckout([{art:'bar', betrag: s.total_gross}]);
+};
+document.getElementById('btn-pay-card').onclick = async () => {
+  const s = await (await fetch('/api/cart/summary')).json();
+  await doCheckout([{art:'karte', betrag: s.total_gross}]);
+};
+document.getElementById('btn-pay-twint').onclick = async () => {
+  const s = await (await fetch('/api/cart/summary')).json();
+  await doCheckout([{art:'twint', betrag: s.total_gross}]);
+};
+document.getElementById('btn-invoice').onclick = async () => {
+  const s = await (await fetch('/api/cart/summary')).json();
+  await doCheckout([{art:'rechnung', betrag: s.total_gross}]);
+};
+document.getElementById('btn-split').onclick = async () => {
+  const s = await (await fetch('/api/cart/summary')).json();
+  const total = s.total_gross || 0;
+  const a = prompt('Betrag Teilzahlung 1 (Bar):', (total/2).toFixed(2));
+  if(a===null) return;
+  const b = (total - parseFloat(a||'0')).toFixed(2);
+  await doCheckout([{art:'bar', betrag: parseFloat(a||'0')},{art:'karte', betrag: parseFloat(b)}]);
+};
+
+// init
+loadConfig().then(() => loadCatalog().then(refreshCart));
+</script>
+{% endblock %}

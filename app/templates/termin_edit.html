@@ -1,0 +1,80 @@
+<!-- kassensystem_basic/app/templates/termin_edit.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Termin bearbeiten</h2>
+
+<form method="post" action="/ui/termin/{{ item.id }}/edit" class="max-w-2xl bg-white border rounded-2xl p-4 space-y-3">
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">Datum *</label>
+      <input id="datum" type="date" name="datum" required value="{{ item.start.date() }}" class="w-full border rounded-lg px-3 py-2">
+    </div>
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">Start *</label>
+      <input id="start" type="time" name="start" required value="{{ item.start.time().strftime('%H:%M') }}" class="w-full border rounded-lg px-3 py-2">
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">Mitarbeiter</label>
+      <select name="mitarbeiter_id" class="w-full border rounded-lg px-3 py-2">
+        <option value="">—</option>
+        {% for m in staff %}<option value="{{ m.id }}" {% if item.mitarbeiter_id==m.id %}selected{% endif %}>{{ m.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">Kunde</label>
+      <select name="kunde_id" class="w-full border rounded-lg px-3 py-2">
+        <option value="">Laufkunde</option>
+        {% for k in kunden %}<option value="{{ k.id }}" {% if item.kunde_id==k.id %}selected{% endif %}>{{ k.name }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-sm text-gray-600 mb-1">Services (Mehrfachwahl möglich)</label>
+    <select id="services" name="services" multiple class="w-full border rounded-lg px-3 py-2 h-40">
+      {% for s in services %}
+        <option value="{{ s.id }}" data-dauer="{{ s.dauer_min }}" {% if s.id in selected_services %}selected{% endif %}>{{ s.name }} ({{ s.dauer_min }} Min)</option>
+      {% endfor %}
+    </select>
+    <p class="text-xs text-gray-500 mt-1">Gesamtdauer: <span id="dur">0</span> Min</p>
+    <input type="hidden" name="dauer_min" id="dauer_min">
+  </div>
+
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">Zustand</label>
+      <select name="zustand" class="w-full border rounded-lg px-3 py-2">
+        {% for s in ['gebucht','erledigt','no-show','storniert'] %}
+        <option value="{{ s }}" {% if (item.zustand or 'gebucht')==s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">Bemerkung</label>
+      <input name="bemerkung" value="{{ item.bemerkungen if item.bemerkungen is defined else '' }}" class="w-full border rounded-lg px-3 py-2">
+    </div>
+  </div>
+
+  <div class="pt-2">
+    <button class="px-4 py-2 rounded-lg bg-gray-900 text-white">Speichern</button>
+    <a href="/ui/kalender" class="px-4 py-2 rounded-lg border ml-2">Abbrechen</a>
+  </div>
+</form>
+
+<script>
+const svc = document.getElementById('services');
+const dur = document.getElementById('dur');
+const hidden = document.getElementById('dauer_min');
+function recalc(){
+  let total=0;
+  for (const opt of svc.selectedOptions){ total += Number(opt.dataset.dauer||0); }
+  dur.textContent = total;
+  hidden.value = total;
+}
+recalc();
+svc.addEventListener('change', recalc);
+</script>
+{% endblock %}

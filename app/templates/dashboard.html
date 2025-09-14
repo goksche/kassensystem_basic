@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Dashboard</h2>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+  {% if flags.pos %}
+  <a href="/ui/pos" class="group">
+    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
+      <div class="text-2xl font-semibold mb-1">Kasse</div>
+      <div class="text-gray-500 text-sm">Checkout, Zahlungen, Quittungen</div>
+    </div>
+  </a>
+  {% endif %}
+
+  {% if flags.kalender %}
+  <a href="/ui/kalender" class="group">
+    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
+      <div class="text-2xl font-semibold mb-1">Kalender (optional)</div>
+      <div class="text-gray-500 text-sm">Termine, Mitarbeiter, Ressourcen</div>
+    </div>
+  </a>
+  {% endif %}
+
+  {% if flags.kunden %}
+  <a href="/ui/kunden" class="group">
+    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
+      <div class="text-2xl font-semibold mb-1">Kunden</div>
+      <div class="text-gray-500 text-sm">Kartei, Historie, Opt-in</div>
+    </div>
+  </a>
+  {% endif %}
+
+  {% if flags.katalog %}
+  <a href="/ui/katalog" class="group">
+    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
+      <div class="text-2xl font-semibold mb-1">Katalog</div>
+      <div class="text-gray-500 text-sm">Services & Produkte, Preise, Steuern</div>
+    </div>
+  </a>
+  {% endif %}
+
+  {% if flags.berichte %}
+  <a href="/ui/berichte" class="group">
+    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
+      <div class="text-2xl font-semibold mb-1">Berichte</div>
+      <div class="text-gray-500 text-sm">Umsatz, MWST, Top-Seller</div>
+    </div>
+  </a>
+  {% endif %}
+
+  {% if flags.abschluss %}
+  <a href="/ui/abschluss" class="group">
+    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
+      <div class="text-2xl font-semibold mb-1">Tagesabschluss</div>
+      <div class="text-gray-500 text-sm">Kassensturz, Z-Report</div>
+    </div>
+  </a>
+  {% endif %}
+
+  {% if flags.einstellungen %}
+  <a href="/ui/einstellungen" class="group">
+    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
+      <div class="text-2xl font-semibold mb-1">Einstellungen</div>
+      <div class="text-gray-500 text-sm">RBAC, Policies, Branding</div>
+    </div>
+  </a>
+  {% endif %}
+
+  {% if flags.gast %}
+  <a href="/ui/gast" class="group">
+    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
+      <div class="text-2xl font-semibold mb-1">Gast-Portal</div>
+      <div class="text-gray-500 text-sm">Eigene Daten & Produktpreise (read-only)</div>
+    </div>
+  </a>
+  {% endif %}
+
+</div>
+{% endblock %}

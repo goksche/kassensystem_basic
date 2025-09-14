@@ -1,0 +1,52 @@
+<!-- kassensystem_basic/app/templates/receipt.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white border rounded-2xl p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-semibold">Quittung</h2>
+    <div class="text-sm text-gray-500">Beleg-Nr: <span class="font-medium">{{ beleg.belegnr }}</span></div>
+  </div>
+  <div class="text-sm text-gray-600 mb-3">
+    Datum: {{ beleg.timestamp }}
+    {% if kunde_name %}
+      • Kunde: <span class="font-medium">{{ kunde_name }}</span>
+    {% endif %}
+  </div>
+
+  <div class="border rounded-xl">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="text-left p-2">Pos</th>
+          <th class="text-left p-2">Name</th>
+          <th class="text-right p-2">Menge</th>
+          <th class="text-right p-2">Einzel</th>
+          <th class="text-right p-2">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in positionen %}
+        <tr class="border-t">
+          <td class="p-2">{{ loop.index }}</td>
+          <td class="p-2">{{ p.name }} <span class="text-xs text-gray-400">({{ p.typ }} • {{ p.steuer_code }})</span></td>
+          <td class="p-2 text-right">{{ "%.2f"|format(p.menge) }}</td>
+          <td class="p-2 text-right">CHF {{ "%.2f"|format(p.einzelpreis) }}</td>
+          <td class="p-2 text-right">CHF {{ "%.2f"|format(p.gesamtpreis) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mt-4 text-sm space-y-1">
+    <div class="flex justify-between"><span>Zwischensumme</span><span>CHF {{ "%.2f"|format(beleg.summe_brutto - beleg.steuer_summe - beleg.trinkgeld) }}</span></div>
+    <div class="flex justify-between"><span>MWST gesamt</span><span>CHF {{ "%.2f"|format(beleg.steuer_summe) }}</span></div>
+    <div class="flex justify-between"><span>Trinkgeld</span><span>CHF {{ "%.2f"|format(beleg.trinkgeld) }}</span></div>
+    <div class="flex justify-between text-lg font-semibold"><span>Total</span><span>CHF {{ "%.2f"|format(beleg.summe_brutto + beleg.trinkgeld) }}</span></div>
+  </div>
+
+  <div class="mt-6">
+    <a href="/ui/pos" class="px-4 py-2 rounded-xl border hover:bg-gray-50">Zurück zur Kasse</a>
+  </div>
+</div>
+{% endblock %}

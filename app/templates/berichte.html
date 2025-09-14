@@ -1,0 +1,93 @@
+<!-- kassensystem_basic/app/templates/berichte.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Berichte</h2>
+
+<div class="flex items-center gap-3 mb-4">
+  <label class="text-sm text-gray-600">Von</label>
+  <input id="from" type="date" value="{{ date_from }}" class="border rounded-lg px-3 py-2">
+  <label class="text-sm text-gray-600">Bis</label>
+  <input id="to" type="date" value="{{ date_to }}" class="border rounded-lg px-3 py-2">
+  <button id="btn-refresh" class="px-3 py-2 rounded-lg border">Aktualisieren</button>
+  <a id="btn-export" href="/ui/berichte/export?from={{ date_from }}&to={{ date_to }}" class="ml-auto px-3 py-2 rounded-lg border">CSV Export</a>
+</div>
+
+<div id="grid" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <section class="bg-white border rounded-2xl p-4">
+    <h3 class="font-semibold mb-2">Kennzahlen</h3>
+    <div class="text-sm space-y-1">
+      <div class="flex justify-between"><span>Umsatz (brutto)</span><span id="m-rev">CHF 0.00</span></div>
+      <div class="flex justify-between"><span>Trinkgeld</span><span id="m-tip">CHF 0.00</span></div>
+      <div class="flex justify-between"><span>MWST gesamt</span><span id="m-tax">CHF 0.00</span></div>
+      <div class="flex justify-between font-semibold border-t pt-2"><span>Ausgaben</span><span id="m-exp">CHF 0.00</span></div>
+      <div class="flex justify-between font-semibold"><span>Ergebnis</span><span id="m-net">CHF 0.00</span></div>
+    </div>
+  </section>
+
+  <section class="bg-white border rounded-2xl p-4">
+    <h3 class="font-semibold mb-2">Zahlarten</h3>
+    <div class="text-sm space-y-1" id="pay-list"></div>
+  </section>
+
+  <section class="bg-white border rounded-2xl p-4">
+    <h3 class="font-semibold mb-2">Top 10 Artikel/Services</h3>
+    <div class="text-sm space-y-1" id="top-list"></div>
+  </section>
+</div>
+
+<section class="bg-white border rounded-2xl p-4 mt-4">
+  <h3 class="font-semibold mb-2">Umsatz nach Tag</h3>
+  <div id="by-day" class="text-sm space-y-1"></div>
+</section>
+
+<script>
+function fmtCHF(x){ return 'CHF ' + Number(x || 0).toFixed(2); }
+const from = document.getElementById('from');
+const to = document.getElementById('to');
+const btnExport = document.getElementById('btn-export');
+
+async function loadReport(){
+  const f = from.value, t = to.value;
+  const res = await fetch('/api/reports/overview?from=' + encodeURIComponent(f) + '&to=' + encodeURIComponent(t));
+  const data = await res.json();
+
+  document.getElementById('m-rev').innerText = fmtCHF(data.umsatz_brutto);
+  document.getElementById('m-tip').innerText = fmtCHF(data.trinkgeld);
+  document.getElementById('m-tax').innerText = fmtCHF(data.mwst_summe);
+  document.getElementById('m-exp').innerText = fmtCHF(data.ausgaben_total);
+  document.getElementById('m-net').innerText = fmtCHF(data.ergebnis);
+
+  const payList = document.getElementById('pay-list'); payList.innerHTML='';
+  Object.entries(data.payments || {}).forEach(([k,v])=>{
+    const row = document.createElement('div');
+    row.className='flex justify-between';
+    row.innerHTML = `<span>${k.toUpperCase()}</span><span>${fmtCHF(v)}</span>`;
+    payList.appendChild(row);
+  });
+  if (!Object.keys(data.payments||{}).length){ payList.innerHTML='<div class="text-gray-500 text-sm">Keine Zahlungen im Zeitraum.</div>'; }
+
+  const top = document.getElementById('top-list'); top.innerHTML='';
+  (data.top || []).forEach(x=>{
+    const row = document.createElement('div');
+    row.className='flex justify-between';
+    row.innerHTML = `<span>${x.typ} • ${x.name}</span><span>${fmtCHF(x.umsatz)}</span>`;
+    top.appendChild(row);
+  });
+  if (!(data.top||[]).length){ top.innerHTML='<div class="text-gray-500 text-sm">Keine Positionen.</div>'; }
+
+  const byDay = document.getElementById('by-day'); byDay.innerHTML='';
+  (data.by_day || []).forEach(x=>{
+    const row = document.createElement('div');
+    row.className='flex justify-between';
+    row.innerHTML = `<span>${x.date}</span><span>${fmtCHF(x.amount)}</span>`;
+    byDay.appendChild(row);
+  });
+
+  btnExport.href = '/ui/berichte/export?from=' + encodeURIComponent(f) + '&to=' + encodeURIComponent(t);
+}
+document.getElementById('btn-refresh').onclick = loadReport;
+from.addEventListener('change', loadReport);
+to.addEventListener('change', loadReport);
+loadReport();
+</script>
+{% endblock %}

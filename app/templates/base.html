@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title or "Kassensystem Basic" }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Tailwind CDN nur fuer Mockups; spaeter lokal bauen -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <header class="bg-white border-b">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/ui/dashboard" class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-indigo-600 rounded-lg"></div>
+          <h1 class="font-semibold">Kassensystem Basic</h1>
+        </a>
+
+        <!-- ENV-Badge: fuer Admin als Button (DEV/PROD umschalten), sonst nur Label -->
+        {% if role == "Admin" %}
+        <form method="post" action="/ui/dev/toggle">
+          <input type="hidden" name="next" value="{{ request.url.path }}">
+          <button title="Nur Admin: DEV/PROD umschalten"
+                  class="text-xs text-white px-2 py-0.5 rounded {{ 'bg-emerald-600' if env=='DEV' else 'bg-gray-700' }}">
+            {{ env }}
+          </button>
+        </form>
+        {% else %}
+        <span class="text-xs text-gray-600 px-2 py-0.5 border rounded">{{ env }}</span>
+        {% endif %}
+      </div>
+
+      <nav class="hidden md:flex items-center gap-1">
+        {% set p = request.url.path %}
+        {% for item in nav_items %}
+          <a href="{{ item.path }}"
+             class="px-3 py-1.5 rounded-lg text-sm {{ 'bg-gray-900 text-white' if p == item.path or (p == '/' and item.path == '/ui/dashboard') else 'text-gray-700 hover:bg-gray-100' }}">
+            {{ item.label }}
+          </a>
+        {% endfor %}
+      </nav>
+
+      <div class="flex items-center gap-4 text-sm">
+        <span class="hidden sm:inline text-gray-500">Rolle: {{ role or "Mitarbeiter" }}</span>
+        <!-- kleine DEV-Demo-Logins (nur fuer Prototyp / spaeter echtes Login) -->
+        {% if env == "DEV" %}
+        <div class="hidden md:flex items-center gap-2 text-xs text-gray-400">
+          <a class="hover:underline" href="/ui/login/Admin">Als Admin</a>
+          <a class="hover:underline" href="/ui/login/Mitarbeiter">Als Mitarbeiter</a>
+          <a class="hover:underline" href="/ui/login/Gast">Als Gast</a>
+        </div>
+        {% endif %}
+        <button class="px-3 py-1.5 rounded-lg bg-gray-900 text-white">Abmelden</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="border-t">
+    <div class="max-w-7xl mx-auto px-4 py-4 text-xs text-gray-500">
+      © {{ year or "2025" }} – Kassensystem Basic
+    </div>
+  </footer>
+</body>
+</html>

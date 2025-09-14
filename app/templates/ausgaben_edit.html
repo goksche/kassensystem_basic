@@ -1,0 +1,39 @@
+<!-- kassensystem_basic/app/templates/ausgaben_edit.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Ausgabe bearbeiten</h2>
+
+<form method="post" action="/ui/ausgaben/{{ item.id }}/edit" class="max-w-xl bg-white border rounded-2xl p-4 space-y-3">
+  <div>
+    <label class="block text-sm text-gray-600 mb-1">Datum *</label>
+    <input type="date" name="datum" required value="{{ item.datum }}" class="w-full border rounded-lg px-3 py-2">
+  </div>
+  <div>
+    <label class="block text-sm text-gray-600 mb-1">Kategorie</label>
+    <input name="kategorie" value="{{ item.kategorie or '' }}" class="w-full border rounded-lg px-3 py-2">
+  </div>
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">Betrag (CHF) *</label>
+      <input type="number" name="betrag" required min="0" step="0.05" value="{{ '%.2f'|format(item.betrag) }}" class="w-full border rounded-lg px-3 py-2">
+    </div>
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">Zahlart *</label>
+      <select name="zahlart" class="w-full border rounded-lg px-3 py-2">
+        <option value="bar" {% if item.zahlart=='bar' %}selected{% endif %}>Bar</option>
+        <option value="karte" {% if item.zahlart=='karte' %}selected{% endif %}>Karte</option>
+        <option value="twint" {% if item.zahlart=='twint' %}selected{% endif %}>TWINT</option>
+        <option value="rechnung" {% if item.zahlart=='rechnung' %}selected{% endif %}>Rechnung</option>
+      </select>
+    </div>
+  </div>
+  <div class="flex items-center">
+    <input type="checkbox" name="belegt" value="1" {% if item.belegt %}checked{% endif %} class="mr-2">
+    <label>Beleg vorhanden</label>
+  </div>
+  <div class="pt-2 flex gap-2">
+    <button class="px-4 py-2 rounded-lg bg-gray-900 text-white">Speichern</button>
+    <a href="/ui/ausgaben" class="px-4 py-2 rounded-lg border">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}
