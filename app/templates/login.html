@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Login – Kassensystem Basic</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-100 flex items-center justify-center">
+  <div class="w-full max-w-md bg-white shadow rounded-lg p-6">
+    <h1 class="text-xl font-semibold mb-4 text-center">Anmelden</h1>
+
+    {% if error %}
+      <div class="mb-4 p-3 rounded bg-red-100 text-red-700 text-sm">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <form method="post" action="/login" class="space-y-4">
+      <div>
+        <label class="block text-sm mb-1">E-Mail</label>
+        <input name="email" type="email" required class="w-full border rounded px-3 py-2"
+               placeholder="admin@example.com">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Passwort</label>
+        <input name="password" type="password" required class="w-full border rounded px-3 py-2"
+               placeholder="••••••••">
+      </div>
+      <button type="submit" class="w-full py-2 rounded bg-black text-white hover:bg-gray-800">Einloggen</button>
+    </form>
+
+    <p class="mt-6 text-xs text-gray-500 text-center">
+      Demo: admin@example.com / admin1234
+    </p>
+  </div>
+</body>
+</html>

@@ -1,7 +1,7 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-alembic
-jinja2
-reportlab
-pandas
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+jinja2==3.1.4
+sqlalchemy==2.0.35
+pydantic==1.10.15
+python-multipart==0.0.9
+passlib[bcrypt]==1.7.4

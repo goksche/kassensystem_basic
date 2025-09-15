@@ -1,73 +1,45 @@
-import os
-from typing import List, Dict
+from pydantic import BaseSettings
+from functools import lru_cache
+from typing import List
 
-# Grundeinstellungen
-APP_NAME = "Kassensystem Basic"
-VERSION = "0.1.0"
-DATABASE_URL = "sqlite:///./db/kassensystem.db"
 
-# Secret fuer Session-Cookies (in PROD ueber Env setzen!)
-SECRET_KEY = os.getenv("KSB_SECRET", "change-this-in-prod-very-secret")
+class Settings(BaseSettings):
+    APP_NAME: str = "Kassensystem Basic"
+    DEBUG: bool = True
 
-# Default-DEV (kann per Button zur Laufzeit pro Session ueberschrieben werden)
-DEFAULT_DEV_MODE: bool = os.getenv("KSB_DEV", "1") == "1"
+    # Session/Secret
+    SECRET_KEY: str = "change-this-in-production-please-32bytes"
+    SESSION_COOKIE_NAME: str = "ksb_session"
 
-# -------------------------------
-# Header-Navigation Konfiguration
-# -------------------------------
+    # DEV-Modus (nur Admin darf toggeln; Sichtbarkeit steuert Template via Rolle)
+    DEV_MODE: bool = True
 
-NAV_ITEMS_PROD: List[Dict] = [
-    {"path": "/ui/dashboard",    "label": "Dashboard",         "visible": True},
-    {"path": "/ui/pos",          "label": "Kasse",             "visible": True},
-    {"path": "/ui/kalender",     "label": "Kalender (optional)","visible": True},
-    {"path": "/ui/kunden",       "label": "Kunden",            "visible": True},
-    {"path": "/ui/katalog",      "label": "Katalog",           "visible": True},
-    {"path": "/ui/berichte",     "label": "Berichte",          "visible": True},
-    {"path": "/ui/abschluss",    "label": "Tagesabschluss",    "visible": True},
-    {"path": "/ui/gast",         "label": "Gast-Portal",       "visible": True},
-    {"path": "/ui/einstellungen", "label": "Einstellungen",     "visible": True},
-]
+    # Header-Navigation & Dashboard-Kacheln konfigurierbar (wir lesen/schreiben hier;
+    # Persistenz kann später via DB/JSON erfolgen)
+    HEADER_ITEMS: List[str] = [
+        "Dashboard",
+        "POS",
+        "Katalog",
+        "Kalender",
+        "Kunden",
+        "Mitarbeiter",
+        "Berichte",
+        "Ausgaben",
+        "Abschluss",
+        "Gast-Portal",
+    ]
+    DASHBOARD_TILES: List[str] = [
+        "Schnellstart POS",
+        "Heutige Termine",
+        "Top Artikel",
+        "Umsatz heute",
+        "Kassenbuch",
+    ]
 
-# DEV-Nav (im DEV per Button sichtbar – hier Reihenfolge/Sichtbarkeit steuern)
-NAV_ITEMS_DEV: List[Dict] = [
-    {"path": "/ui/dashboard",    "label": "Dashboard",         "visible": True},
-    {"path": "/ui/pos",          "label": "Kasse",             "visible": True},
-    {"path": "/ui/kalender",     "label": "Kalender (optional)","visible": True},
-    {"path": "/ui/kunden",       "label": "Kunden",            "visible": True},
-    {"path": "/ui/katalog",      "label": "Katalog",           "visible": True},
-    {"path": "/ui/berichte",     "label": "Berichte",          "visible": True},
-    {"path": "/ui/abschluss",    "label": "Tagesabschluss",    "visible": True},
-    {"path": "/ui/gast",         "label": "Gast-Portal",       "visible": True},
-    {"path": "/ui/einstellungen", "label": "Einstellungen",     "visible": True},
-]
+    class Config:
+        case_sensitive = True
 
-def get_nav_items(dev_mode: bool) -> List[Dict]:
-    items = NAV_ITEMS_DEV if dev_mode else NAV_ITEMS_PROD
-    return [i for i in items if i.get("visible", True)]
 
-# -------------------------------
-# Dashboard-Tiles Konfiguration
-# -------------------------------
-DASH_TILES_DEV: Dict[str, bool] = {
-    "pos": True,
-    "kalender": True,
-    "kunden": True,
-    "katalog": True,
-    "berichte": True,
-    "abschluss": True,
-    "einstellungen": True,
-    "gast": True,
-}
-DASH_TILES_PROD: Dict[str, bool] = {
-    "pos": True,
-    "kalender": True,
-    "kunden": True,
-    "katalog": True,
-    "berichte": True,
-    "abschluss": True,
-    "einstellungen": True,
-    "gast": True,
-}
-
-def get_dash_flags(dev_mode: bool) -> Dict[str, bool]:
-    return DASH_TILES_DEV if dev_mode else DASH_TILES_PROD
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
