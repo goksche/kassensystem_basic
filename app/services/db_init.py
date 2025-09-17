@@ -1,57 +1,34 @@
-from sqlalchemy.orm import Session
+# kassensystem_basic/app/services/db_init.py
+from __future__ import annotations
 
-from app.models.user import User, UserRole
-from app.services.auth import hash_password
+from pathlib import Path
+from typing import Optional
+
+from app.models.base import Base, engine, SessionLocal
+# Alle Modelle registrieren (Side-Effect-Import)
+import app.models.entities  # noqa: F401
+import app.models.user  # noqa: F401
+from app.services.auth import seed_users_if_empty
 
 
-def seed_core_users(db: Session) -> None:
+def _ensure_sqlite_parent_dir() -> None:
+    """Erstellt den Ordner fuer die SQLite-Datei, falls noetig."""
+    try:
+        db_file: Optional[str] = engine.url.database  # type: ignore[attr-defined]
+        if db_file:
+            Path(db_file).parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+
+def init_db(dev_seed: bool = True) -> None:
     """
-    Legt initiale Benutzer an, falls nicht vorhanden.
-    Passwoerter sind Demo-Passwoerter – bitte nach dem ersten Login aendern.
+    Initialisiert die DB-Struktur und legt (optional) Demo-User an.
+    Wird beim App-Startup von main.py aufgerufen.
     """
-    default_users = [
-        {
-            "email": "owner@example.com",
-            "full_name": "Owner Demo",
-            "role": UserRole.OWNER,
-            "password": "owner1234",
-        },
-        {
-            "email": "admin@example.com",
-            "full_name": "Admin Demo",
-            "role": UserRole.ADMIN,
-            "password": "admin1234",
-        },
-        {
-            "email": "buchhaltung@example.com",
-            "full_name": "Buchhaltung Demo",
-            "role": UserRole.BUCHHALTUNG,
-            "password": "buch1234",
-        },
-        {
-            "email": "mitarbeiter@example.com",
-            "full_name": "Mitarbeiter Demo",
-            "role": UserRole.MITARBEITER,
-            "password": "mitarbeiter1234",
-        },
-        {
-            "email": "gast@example.com",
-            "full_name": "Gast Demo",
-            "role": UserRole.GAST,
-            "password": "gast1234",
-        },
-    ]
+    _ensure_sqlite_parent_dir()
+    Base.metadata.create_all(bind=engine)
 
-    for u in default_users:
-        exists = db.query(User).filter(User.email == u["email"]).first()
-        if not exists:
-            db.add(
-                User(
-                    email=u["email"],
-                    full_name=u["full_name"],
-                    role=u["role"],
-                    password_hash=hash_password(u["password"]),
-                    is_active=True,
-                )
-            )
-    db.commit()
+    if dev_seed:
+        with SessionLocal() as db:
+            seed_users_if_empty(db)

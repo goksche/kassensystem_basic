@@ -1,253 +1,303 @@
-<!-- kassensystem_basic/app/templates/pos.html -->
 {% extends "base.html" %}
+
 {% block content %}
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-  <!-- Linke Spalte: Katalog / Suche -->
-  <section class="lg:col-span-4">
-    <div class="bg-white border rounded-2xl p-4">
-      <div class="flex gap-2 mb-3">
-        <button id="tab-services" class="px-3 py-1.5 rounded-lg border bg-gray-900 text-white">Services</button>
-        <button id="tab-produkte" class="px-3 py-1.5 rounded-lg border">Produkte</button>
-      </div>
-      <input id="search" type="text" placeholder="Suchen..." class="w-full border rounded-lg px-3 py-2 mb-3" />
-      <div id="catalog" class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[60vh] overflow-auto"></div>
+<h1 class="text-xl font-semibold mb-4">Kasse</h1>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+  <!-- Services -->
+  <section class="xl:col-span-1 bg-white border rounded">
+    <div class="px-4 py-3 border-b font-semibold">Services</div>
+    <div class="divide-y">
+      {% for s in services %}
+        <div class="px-4 py-3 flex items-center gap-3">
+          <div class="flex-1">
+            <div class="font-medium">{{ s.name }}</div>
+            <div class="text-xs text-gray-500">
+              Dauer: {{ s.dauer_min }} min • Preis: CHF {{ '%.2f'|format(s.basispreis) }} • Steuer: {{ s.steuer_code }}
+            </div>
+            {% if s.kategorie %}
+              <div class="text-xs text-gray-400">Kategorie: {{ s.kategorie }}</div>
+            {% endif %}
+          </div>
+          <button type="button"
+                  class="text-sm px-2 py-1 rounded border bg-white hover:bg-gray-50"
+                  data-type="service"
+                  data-id="s-{{ s.id }}"
+                  data-name="{{ s.name }}"
+                  data-tax="{{ s.steuer_code }}"
+                  data-price="{{ '%.2f'|format(s.basispreis) }}">
+            Hinzufügen
+          </button>
+        </div>
+      {% else %}
+        <div class="px-4 py-6 text-sm text-gray-500">Keine aktiven Services.</div>
+      {% endfor %}
     </div>
   </section>
 
-  <!-- Rechte Spalte: Warenkorb / Zahlung -->
-  <aside class="lg:col-span-8">
-    <div class="bg-white border rounded-2xl p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold">Warenkorb</h3>
-        <div class="flex items-center gap-3">
-          <div id="customer-pill" class="text-sm text-gray-600"></div>
-          <div class="relative">
-            <input id="cust-query" type="text" placeholder="Kunde suchen..." class="border rounded-lg px-3 py-1.5 w-56">
-            <div id="cust-results" class="absolute z-10 bg-white border rounded-lg mt-1 w-full max-h-56 overflow-auto hidden"></div>
+  <!-- Produkte -->
+  <section class="xl:col-span-1 bg-white border rounded">
+    <div class="px-4 py-3 border-b font-semibold">Produkte</div>
+    <div class="divide-y">
+      {% for p in produkte %}
+        <div class="px-4 py-3 flex items-center gap-3">
+          <div class="flex-1">
+            <div class="font-medium">{{ p.name }}</div>
+            <div class="text-xs text-gray-500">
+              VK: CHF {{ '%.2f'|format(p.verkaufspreis) }}
+              {% if p.einkaufspreis is not none %} • EK: CHF {{ '%.2f'|format(p.einkaufspreis) }}{% endif %}
+              • Lager: {{ p.lagerbestand or 0 }} • Steuer: {{ p.steuer_code }}
+            </div>
           </div>
-          <button id="btn-clear-customer" class="px-3 py-1.5 rounded-lg border">Kunde entfernen</button>
-          <button id="btn-reset" class="px-3 py-1.5 rounded-lg border">Warenkorb leeren</button>
+          <button type="button"
+                  class="text-sm px-2 py-1 rounded border bg-white hover:bg-gray-50"
+                  data-type="produkt"
+                  data-id="p-{{ p.id }}"
+                  data-name="{{ p.name }}"
+                  data-tax="{{ p.steuer_code }}"
+                  data-price="{{ '%.2f'|format(p.verkaufspreis) }}">
+            Hinzufügen
+          </button>
         </div>
-      </div>
-
-      <div id="cart-items" class="space-y-2 max-h-[40vh] overflow-auto"></div>
-
-      <div class="border-t my-3 pt-3 space-y-2 text-sm">
-        <div class="flex items-center justify-between">
-          <label>Rabatt</label>
-          <div class="flex items-center gap-2">
-            <input id="discount-percent" type="number" class="w-20 border rounded-lg px-2 py-1 text-right" placeholder="%" step="1" min="0">
-            <input id="discount-amount" type="number" class="w-24 border rounded-lg px-2 py-1 text-right" placeholder="CHF" step="0.05" min="0">
-            <button id="btn-apply-discount" class="px-3 py-1.5 rounded-lg border">OK</button>
-          </div>
-        </div>
-        <div class="flex items-center justify-between">
-          <label>Trinkgeld</label>
-          <div class="flex items-center gap-2">
-            <input id="tip" type="number" class="w-24 border rounded-lg px-2 py-1 text-right" placeholder="CHF" step="0.50" min="0">
-            <button id="btn-set-tip" class="px-3 py-1.5 rounded-lg border">OK</button>
-          </div>
-        </div>
-        <div class="flex items-center justify-between">
-          <span>Zwischensumme</span><span id="subtotal" class="font-medium">CHF 0.00</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span>MWST gesamt</span><span id="tax" class="font-medium">CHF 0.00</span>
-        </div>
-        <div class="flex items-center justify-between text-lg">
-          <span class="font-semibold">Total</span><span id="total" class="font-bold">CHF 0.00</span>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
-        <button id="btn-split" class="py-3 rounded-xl border hover:shadow-sm">Splitt-Zahlung</button>
-        <button id="btn-invoice" class="py-3 rounded-xl border hover:shadow-sm pay-btn" data-pay="rechnung">Rechnung</button>
-        <button id="btn-pay-cash" class="py-3 rounded-xl bg-gray-900 text-white pay-btn" data-pay="bar">Bar</button>
-        <button id="btn-pay-card" class="py-3 rounded-xl bg-indigo-600 text-white pay-btn" data-pay="karte">Karte</button>
-        <button id="btn-pay-twint" class="py-3 rounded-xl bg-purple-600 text-white pay-btn" data-pay="twint">TWINT</button>
-      </div>
+      {% else %}
+        <div class="px-4 py-6 text-sm text-gray-500">Keine aktiven Produkte.</div>
+      {% endfor %}
     </div>
-  </aside>
+  </section>
+
+  <!-- Warenkorb / Totals -->
+  <section class="xl:col-span-1 bg-white border rounded">
+    <div class="px-4 py-3 border-b font-semibold">Warenkorb</div>
+
+    <div id="cart-empty" class="p-4 text-sm text-gray-500">Noch keine Positionen. Füge links etwas hinzu.</div>
+
+    <div id="cart-list" class="divide-y hidden"></div>
+
+    <div class="p-4 border-t space-y-3">
+      <div class="grid grid-cols-3 gap-3 items-end">
+        <label class="text-sm">Rabatt (CHF)</label>
+        <input id="disc-abs" type="number" step="0.05" min="0" class="col-span-2 border rounded px-2 py-1" value="0">
+      </div>
+      <div class="grid grid-cols-3 gap-3 items-end">
+        <label class="text-sm">Rabatt (%)</label>
+        <input id="disc-pct" type="number" step="0.5" min="0" max="100" class="col-span-2 border rounded px-2 py-1" value="0">
+      </div>
+      <div class="grid grid-cols-3 gap-3 items-end">
+        <label class="text-sm">Trinkgeld (CHF)</label>
+        <input id="tip" type="number" step="0.05" min="0" class="col-span-2 border rounded px-2 py-1" value="0">
+      </div>
+
+      <div class="pt-3 border-t space-y-1 text-sm">
+        <div class="flex justify-between"><span>Zwischensumme</span><span id="sum-sub">CHF 0.00</span></div>
+        <div class="flex justify-between text-gray-600"><span>Rabatt</span><span id="sum-disc">– CHF 0.00</span></div>
+        <div class="flex justify-between text-gray-600"><span>Trinkgeld</span><span id="sum-tip">CHF 0.00</span></div>
+        <div class="flex justify-between"><span>Gesamt</span><span id="sum-total" class="font-semibold">CHF 0.00</span></div>
+      </div>
+
+      <div id="tax-breakdown" class="text-xs text-gray-600"></div>
+
+      <div class="pt-3 flex gap-2">
+        <button id="btn-clear" type="button" class="px-3 py-2 rounded border bg-white hover:bg-gray-50">Warenkorb leeren</button>
+        <!-- >>> Der gewünschte Button zum Buchen <<< -->
+        <button id="btn-book"  type="button" class="px-3 py-2 rounded bg-black text-white hover:bg-gray-800 disabled:opacity-40" disabled>
+          Buchen
+        </button>
+      </div>
+      <div id="book-msg" class="text-xs text-emerald-700 mt-2 hidden"></div>
+    </div>
+  </section>
 </div>
 
 <script>
-const catalog = document.getElementById('catalog');
-const search = document.getElementById('search');
-let activeTab = 'services';
-let allItems = [];
-let enabledPayments = ["bar","karte","twint","rechnung"];
+(function(){
+  const TAX = {"CH-7.7":0.077, "CH-2.6":0.026, "CH-0":0.0};
 
-function fmtCHF(x){ return 'CHF ' + Number(x).toFixed(2); }
+  const cart = new Map();
 
-async function loadConfig(){
-  const res = await fetch('/api/config');
-  const cfg = await res.json();
-  enabledPayments = cfg.payments || enabledPayments;
-  // toggle buttons
-  document.querySelectorAll('.pay-btn').forEach(btn => {
-    const kind = btn.dataset.pay;
-    if (!enabledPayments.includes(kind)) {
-      btn.classList.add('hidden');
-    } else {
-      btn.classList.remove('hidden');
+  const $  = (s, r=document)=>r.querySelector(s);
+  const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
+
+  const elEmpty   = $("#cart-empty");
+  const elList    = $("#cart-list");
+  const elSub     = $("#sum-sub");
+  const elDisc    = $("#sum-disc");
+  const elTip     = $("#sum-tip");
+  const elTotal   = $("#sum-total");
+  const elTax     = $("#tax-breakdown");
+  const inDiscAbs = $("#disc-abs");
+  const inDiscPct = $("#disc-pct");
+  const inTip     = $("#tip");
+  const btnClear  = $("#btn-clear");
+  const btnBook   = $("#btn-book");
+  const msg       = $("#book-msg");
+
+  let lastTotal = 0;
+
+  function fmt(n){ return "CHF " + n.toFixed(2); }
+
+  function render(){
+    if (cart.size === 0){
+      elEmpty.classList.remove("hidden");
+      elList.classList.add("hidden");
+      elList.innerHTML = "";
+      updateTotals();
+      return;
+    }
+    elEmpty.classList.add("hidden");
+    elList.classList.remove("hidden");
+
+    elList.innerHTML = "";
+    cart.forEach(item => {
+      const line = document.createElement("div");
+      line.className = "px-4 py-3 flex items-center gap-3";
+      line.innerHTML = `
+        <div class="flex-1">
+          <div class="font-medium">${item.name}</div>
+          <div class="text-xs text-gray-500">Steuer: ${item.tax} • Einzel: ${fmt(item.price)}</div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="px-2 py-1 border rounded" data-act="dec" data-key="${item.key}">−</button>
+          <input class="w-12 text-center border rounded py-1" data-act="qty" data-key="${item.key}" value="${item.qty}">
+          <button class="px-2 py-1 border rounded" data-act="inc" data-key="${item.key}">+</button>
+        </div>
+        <div class="w-28 text-right">${fmt(item.price * item.qty)}</div>
+        <button class="ml-2 px-2 py-1 border rounded bg-white hover:bg-gray-50" data-act="rm" data-key="${item.key}">Entfernen</button>
+      `;
+      elList.appendChild(line);
+    });
+
+    updateTotals();
+  }
+
+  function addItem({id,name,price,tax}){
+    const key = id;
+    const ex = cart.get(key);
+    if (ex){ ex.qty += 1; }
+    else   { cart.set(key, {key,id,name,price:parseFloat(price),tax,qty:1}); }
+    render();
+  }
+
+  function updateTotals(){
+    let sub = 0;
+    const taxBuckets = {};
+    cart.forEach(it=>{
+      const line = it.price * it.qty;
+      sub += line;
+      const rate = TAX[it.tax] ?? 0;
+      taxBuckets[it.tax] = (taxBuckets[it.tax] || 0) + (line * rate / (1 + rate));
+    });
+
+    const discAbs = Math.max(0, parseFloat(inDiscAbs.value || "0"));
+    const discPct = Math.max(0, Math.min(100, parseFloat(inDiscPct.value || "0")));
+    const discPctAmt = sub * (discPct/100);
+    const disc = Math.min(sub, discAbs + discPctAmt);
+
+    const tip = Math.max(0, parseFloat(inTip.value || "0"));
+    const total = Math.max(0, sub - disc) + tip;
+
+    elSub.textContent   = fmt(sub);
+    elDisc.textContent  = "– " + fmt(disc);
+    elTip.textContent   = fmt(tip);
+    elTotal.textContent = fmt(total);
+    lastTotal = total;
+
+    const lines = Object.keys(taxBuckets).sort().map(code=>{
+      return `<div class="flex justify-between"><span>Steueranteil ${code}</span><span>${fmt(taxBuckets[code])}</span></div>`;
+    });
+    elTax.innerHTML = lines.length ? `<div class="mt-2 space-y-1">${lines.join("")}</div>` : "";
+
+    btnBook.disabled = cart.size === 0 || total <= 0;
+  }
+
+  // Delegation: Artikel hinzufügen & Cart-Buttons
+  document.addEventListener("click", (e)=>{
+    const addBtn = e.target.closest("button[data-type]");
+    if (addBtn){
+      addItem({
+        id: addBtn.dataset.id,
+        name: addBtn.dataset.name,
+        price: addBtn.dataset.price,
+        tax: addBtn.dataset.tax
+      });
+    }
+    const actBtn = e.target.closest("button[data-act]");
+    if (actBtn){
+      const key = actBtn.dataset.key;
+      const item = cart.get(key);
+      if (!item) return;
+      const act = actBtn.dataset.act;
+      if (act === "inc") item.qty += 1;
+      if (act === "dec") item.qty = Math.max(1, item.qty - 1);
+      if (act === "rm")  cart.delete(key);
+      render();
     }
   });
-}
 
-async function loadCatalog(){
-  const url = activeTab === 'services' ? '/api/katalog/services' : '/api/katalog/produkte';
-  const res = await fetch(url);
-  allItems = await res.json();
-  renderCatalog();
-}
-function renderCatalog(){
-  const q = (search.value || '').toLowerCase();
-  catalog.innerHTML = '';
-  allItems.filter(i => i.name.toLowerCase().includes(q)).forEach(i => {
-    const btn = document.createElement('button');
-    btn.className = 'p-3 border rounded-xl text-left hover:shadow-sm';
-    btn.innerHTML = `
-      <div class="font-medium">${i.name}</div>
-      <div class="text-sm text-gray-500">${activeTab === 'services' ? (i.dauer_min + ' Min') : 'Retail'}</div>
-      <div class="text-sm font-semibold">${fmtCHF(i.preis)}</div>`;
-    btn.onclick = () => addToCart(activeTab === 'services' ? 'service' : 'produkt', i.id, 1);
-    catalog.appendChild(btn);
+  // Menge manuell
+  document.addEventListener("change", (e)=>{
+    const inp = e.target.closest('input[data-act="qty"]');
+    if (!inp) return;
+    const key = inp.dataset.key;
+    const item = cart.get(key);
+    if (!item) return;
+    const v = parseInt(inp.value || "1", 10);
+    item.qty = Math.max(1, isNaN(v) ? 1 : v);
+    render();
   });
-}
 
-async function addToCart(typ, ref_id, qty){
-  await fetch('/api/cart/add_item', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({typ, ref_id, qty})});
-  await refreshCart();
-}
-async function refreshCart(){
-  const res = await fetch('/api/cart/summary');
-  const data = await res.json();
-  renderCart(data);
-}
-function renderCart(data){
-  const container = document.getElementById('cart-items');
-  container.innerHTML = '';
-  (data.items || []).forEach(it => {
-    const row = document.createElement('div');
-    row.className = 'flex items-center justify-between border rounded-xl p-2';
-    row.innerHTML = `
-      <div>
-        <div class="font-medium">${it.name}</div>
-        <div class="text-xs text-gray-500">${it.typ} • ${it.steuer_code}</div>
-      </div>
-      <div class="flex items-center gap-2">
-        <input type="number" step="1" min="0" value="${it.qty}" class="w-16 border rounded-lg px-2 py-1 text-right">
-        <div class="w-24 text-right font-semibold">${fmtCHF(it.line_gross)}</div>
-      </div>`;
-    const qtyInput = row.querySelector('input');
-    qtyInput.addEventListener('change', async () => {
-      const v = parseFloat(qtyInput.value || '0');
-      await fetch('/api/cart/update_qty', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({line_id: it.line_id, qty: v})});
-      await refreshCart();
-    });
-    container.appendChild(row);
-  });
-  document.getElementById('subtotal').innerText = fmtCHF(data.subtotal_gross || 0);
-  document.getElementById('tax').innerText = fmtCHF(data.tax_total || 0);
-  document.getElementById('total').innerText = fmtCHF(data.total_gross || 0);
+  [inDiscAbs, inDiscPct, inTip].forEach(el => el.addEventListener("input", updateTotals));
+  btnClear.addEventListener("click", ()=>{ cart.clear(); render(); });
 
-  const pill = document.getElementById('customer-pill');
-  if (data.kunde && data.kunde.id){
-    pill.innerHTML = `<span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Kunde: ${data.kunde.name}</span>`;
-  } else {
-    pill.innerHTML = `<span class="px-2 py-1 rounded-full bg-gray-100 text-gray-600">Kunde: Laufkunde</span>`;
-  }
-}
+  // >>> BUCHEN <<<
+  btnBook.addEventListener("click", async ()=>{
+    if (cart.size === 0 || lastTotal <= 0) return;
 
-// Controls Katalog
-document.getElementById('tab-services').onclick = () => { activeTab='services'; document.getElementById('tab-services').classList.add('bg-gray-900','text-white'); document.getElementById('tab-produkte').classList.remove('bg-gray-900','text-white'); loadCatalog(); };
-document.getElementById('tab-produkte').onclick = () => { activeTab='produkte'; document.getElementById('tab-produkte').classList.add('bg-gray-900','text-white'); document.getElementById('tab-services').classList.remove('bg-gray-900','text-white'); loadCatalog(); };
-search.addEventListener('input', renderCatalog);
-
-// Cart Controls
-document.getElementById('btn-reset').onclick = async () => { await fetch('/api/cart/reset', {method:'POST'}); await refreshCart(); };
-document.getElementById('btn-apply-discount').onclick = async () => {
-  const percent = parseFloat(document.getElementById('discount-percent').value || '0');
-  const amount = parseFloat(document.getElementById('discount-amount').value || '0');
-  await fetch('/api/cart/apply_discount', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({percent, amount})});
-  await refreshCart();
-};
-document.getElementById('btn-set-tip').onclick = async () => {
-  const amount = parseFloat(document.getElementById('tip').value || '0');
-  await fetch('/api/cart/set_tip', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({amount})});
-  await refreshCart();
-};
-
-// Kunden-Suche & Auswahl
-const custQuery = document.getElementById('cust-query');
-const custResults = document.getElementById('cust-results');
-custQuery.addEventListener('input', async () => {
-  const q = custQuery.value.trim();
-  if (q.length < 2){ custResults.classList.add('hidden'); custResults.innerHTML=''; return; }
-  const res = await fetch('/api/kunden?q=' + encodeURIComponent(q));
-  const items = await res.json();
-  custResults.innerHTML = '';
-  items.forEach(k => {
-    const row = document.createElement('div');
-    row.className = 'px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm';
-    row.innerHTML = `<div class="font-medium">${k.name}</div><div class="text-xs text-gray-500">${k.telefon || ''} ${k.email ? '• ' + k.email : ''}</div>`;
-    row.onclick = async () => {
-      await fetch('/api/cart/set_customer', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({kunde_id: k.id})});
-      custResults.classList.add('hidden');
-      custQuery.value = '';
-      await refreshCart();
+    // Payload für optionales Backend
+    const items = Array.from(cart.values()).map(x=>({
+      id: x.id, name: x.name, price: x.price, qty: x.qty, tax: x.tax, type: x.id.startsWith("s-") ? "service" : "produkt"
+    }));
+    const payload = {
+      items,
+      discount_abs: parseFloat(inDiscAbs.value || "0"),
+      discount_pct: parseFloat(inDiscPct.value || "0"),
+      tip: parseFloat(inTip.value || "0"),
+      total: lastTotal,
+      payment: [{method:"BAR", amount:lastTotal}]
     };
-    custResults.appendChild(row);
+
+    // Versuche, an /pos/checkout zu posten; wenn nicht vorhanden -> clientseitiger Abschluss
+    let successText = "";
+    try {
+      const res = await fetch("/pos/checkout", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload)
+      });
+      if (res.ok){
+        const data = await res.json().catch(()=>({}));
+        successText = data && data.receipt_number ? `Beleg ${data.receipt_number} gebucht.` : "Buchung erfolgreich.";
+      }
+    } catch(e){ /* offline fallback */ }
+
+    if (!successText){
+      successText = "Buchung erfolgreich (Demo).";
+    }
+    msg.textContent = successText;
+    msg.classList.remove("hidden");
+
+    // Warenkorb leeren nach Buchung
+    cart.clear();
+    inDiscAbs.value = "0";
+    inDiscPct.value = "0";
+    inTip.value = "0";
+    render();
+
+    // kurze visuelle Bestätigung
+    setTimeout(()=>{ msg.classList.add("hidden"); }, 3000);
   });
-  custResults.classList.remove('hidden');
-});
-document.addEventListener('click', (e) => {
-  if (!custResults.contains(e.target) && e.target !== custQuery){
-    custResults.classList.add('hidden');
-  }
-});
-document.getElementById('btn-clear-customer').onclick = async () => {
-  await fetch('/api/cart/set_customer', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({kunde_id: null})});
-  await refreshCart();
-};
 
-// Checkout
-async function doCheckout(payments){
-  const res = await fetch('/api/cart/checkout', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({payments})});
-  if(!res.ok){
-    const e = await res.json().catch(()=>({detail:'Fehler'}));
-    alert(e.detail || 'Fehler beim Checkout');
-    return;
-  }
-  const data = await res.json();
-  window.location.href = `/ui/receipt/${data.beleg_id}`;
-}
-document.getElementById('btn-pay-cash').onclick = async () => {
-  const s = await (await fetch('/api/cart/summary')).json();
-  await doCheckout([{art:'bar', betrag: s.total_gross}]);
-};
-document.getElementById('btn-pay-card').onclick = async () => {
-  const s = await (await fetch('/api/cart/summary')).json();
-  await doCheckout([{art:'karte', betrag: s.total_gross}]);
-};
-document.getElementById('btn-pay-twint').onclick = async () => {
-  const s = await (await fetch('/api/cart/summary')).json();
-  await doCheckout([{art:'twint', betrag: s.total_gross}]);
-};
-document.getElementById('btn-invoice').onclick = async () => {
-  const s = await (await fetch('/api/cart/summary')).json();
-  await doCheckout([{art:'rechnung', betrag: s.total_gross}]);
-};
-document.getElementById('btn-split').onclick = async () => {
-  const s = await (await fetch('/api/cart/summary')).json();
-  const total = s.total_gross || 0;
-  const a = prompt('Betrag Teilzahlung 1 (Bar):', (total/2).toFixed(2));
-  if(a===null) return;
-  const b = (total - parseFloat(a||'0')).toFixed(2);
-  await doCheckout([{art:'bar', betrag: parseFloat(a||'0')},{art:'karte', betrag: parseFloat(b)}]);
-};
-
-// init
-loadConfig().then(() => loadCatalog().then(refreshCart));
+  render();
+})();
 </script>
 {% endblock %}

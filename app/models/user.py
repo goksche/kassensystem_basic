@@ -1,11 +1,10 @@
+# kassensystem_basic/app/models/user.py
 from datetime import datetime
-from typing import Optional
-
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, UniqueConstraint
+
 from app.models.base import Base
 
-
-# Rollenwerte exakt wie im bestehenden System verwendet
+# Rollen (Strings, konsistent mit main.py und RBAC)
 ROLE_OWNER = "Owner"
 ROLE_ADMIN = "Admin"
 ROLE_MITARBEITER = "Mitarbeiter"

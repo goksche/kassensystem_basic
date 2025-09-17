@@ -1,80 +1,54 @@
 {% extends "base.html" %}
+
 {% block content %}
-<h2 class="text-xl font-semibold mb-4">Dashboard</h2>
+<h1 class="text-xl font-semibold mb-4">Dashboard</h1>
 
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+{% if not current_user %}
+  <div class="mb-6 p-4 rounded border bg-amber-50 border-amber-200 text-amber-800 text-sm">
+    Nicht eingeloggt. Bitte oben rechts <strong>Login</strong> verwenden.
+  </div>
+{% endif %}
 
-  {% if flags.pos %}
-  <a href="/ui/pos" class="group">
-    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
-      <div class="text-2xl font-semibold mb-1">Kasse</div>
-      <div class="text-gray-500 text-sm">Checkout, Zahlungen, Quittungen</div>
-    </div>
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+  {% if flags.pos_quick %}
+  <a href="/pos" class="block rounded-lg bg-white p-5 border hover:shadow transition">
+    <div class="text-sm text-gray-500 mb-1">Schnellstart</div>
+    <div class="text-lg font-semibold">Kasse öffnen</div>
   </a>
   {% endif %}
 
-  {% if flags.kalender %}
-  <a href="/ui/kalender" class="group">
-    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
-      <div class="text-2xl font-semibold mb-1">Kalender (optional)</div>
-      <div class="text-gray-500 text-sm">Termine, Mitarbeiter, Ressourcen</div>
-    </div>
+  {% if flags.termine_heute %}
+  <a href="/kalender" class="block rounded-lg bg-white p-5 border hover:shadow transition">
+    <div class="text-sm text-gray-500 mb-1">Heute</div>
+    <div class="text-lg font-semibold">Termine</div>
   </a>
   {% endif %}
 
-  {% if flags.kunden %}
-  <a href="/ui/kunden" class="group">
-    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
-      <div class="text-2xl font-semibold mb-1">Kunden</div>
-      <div class="text-gray-500 text-sm">Kartei, Historie, Opt-in</div>
-    </div>
+  {% if flags.top_artikel %}
+  <a href="/berichte" class="block rounded-lg bg-white p-5 border hover:shadow transition">
+    <div class="text-sm text-gray-500 mb-1">Top 10</div>
+    <div class="text-lg font-semibold">Positionen</div>
   </a>
   {% endif %}
 
-  {% if flags.katalog %}
-  <a href="/ui/katalog" class="group">
-    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
-      <div class="text-2xl font-semibold mb-1">Katalog</div>
-      <div class="text-gray-500 text-sm">Services & Produkte, Preise, Steuern</div>
-    </div>
+  {% if flags.umsatz_heute %}
+  <a href="/berichte" class="block rounded-lg bg-white p-5 border hover:shadow transition">
+    <div class="text-sm text-gray-500 mb-1">Umsatz</div>
+    <div class="text-lg font-semibold">Heute</div>
   </a>
   {% endif %}
 
-  {% if flags.berichte %}
-  <a href="/ui/berichte" class="group">
-    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
-      <div class="text-2xl font-semibold mb-1">Berichte</div>
-      <div class="text-gray-500 text-sm">Umsatz, MWST, Top-Seller</div>
-    </div>
+  {% if flags.kassenbuch %}
+  <a href="/abschluss" class="block rounded-lg bg-white p-5 border hover:shadow transition">
+    <div class="text-sm text-gray-500 mb-1">Kassenbuch</div>
+    <div class="text-lg font-semibold">Tagesabschluss</div>
   </a>
   {% endif %}
-
-  {% if flags.abschluss %}
-  <a href="/ui/abschluss" class="group">
-    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
-      <div class="text-2xl font-semibold mb-1">Tagesabschluss</div>
-      <div class="text-gray-500 text-sm">Kassensturz, Z-Report</div>
-    </div>
-  </a>
-  {% endif %}
-
-  {% if flags.einstellungen %}
-  <a href="/ui/einstellungen" class="group">
-    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
-      <div class="text-2xl font-semibold mb-1">Einstellungen</div>
-      <div class="text-gray-500 text-sm">RBAC, Policies, Branding</div>
-    </div>
-  </a>
-  {% endif %}
-
-  {% if flags.gast %}
-  <a href="/ui/gast" class="group">
-    <div class="p-6 rounded-2xl border bg-white hover:shadow-md transition">
-      <div class="text-2xl font-semibold mb-1">Gast-Portal</div>
-      <div class="text-gray-500 text-sm">Eigene Daten & Produktpreise (read-only)</div>
-    </div>
-  </a>
-  {% endif %}
-
 </div>
+
+{% if not (flags.pos_quick or flags.termine_heute or flags.top_artikel or flags.umsatz_heute or flags.kassenbuch) %}
+  <div class="mt-6 p-4 rounded border bg-gray-50 text-gray-600 text-sm">
+    Keine Kacheln aktiviert. Aktiviere sie unter <a class="underline" href="/einstellungen">Einstellungen</a>.
+  </div>
+{% endif %}
 {% endblock %}

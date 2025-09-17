@@ -1,46 +1,47 @@
-<!-- kassensystem_basic/app/templates/product_form.html -->
 {% extends "base.html" %}
 {% block content %}
-<h2 class="text-xl font-semibold mb-4">Produkt anlegen</h2>
+<h1 class="text-xl font-semibold mb-4">{{ 'Produkt bearbeiten' if item else 'Produkt anlegen' }}</h1>
 
-<form method="post" action="/ui/katalog/produkt/new" class="max-w-xl bg-white border rounded-2xl p-4 space-y-3">
+<form method="post" class="bg-white border rounded p-4 max-w-2xl space-y-4">
   <div>
-    <label class="block text-sm text-gray-600 mb-1">Name *</label>
-    <input name="name" required class="w-full border rounded-lg px-3 py-2">
+    <label class="block text-sm mb-1">Name *</label>
+    <input name="name" value="{{ (form.name if form else (item.name if item else '')) }}" class="w-full border rounded px-3 py-2">
+    {% if errors.name %}<div class="text-xs text-red-600 mt-1">{{ errors.name }}</div>{% endif %}
   </div>
 
-  <div class="grid grid-cols-2 gap-3">
+  <div class="grid grid-cols-2 gap-4">
     <div>
-      <label class="block text-sm text-gray-600 mb-1">Verkaufspreis (CHF) *</label>
-      <input type="number" name="vk" required min="0" step="0.05" class="w-full border rounded-lg px-3 py-2">
+      <label class="block text-sm mb-1">Verkaufspreis (CHF) *</label>
+      <input name="verkaufspreis" type="text" value="{{ (form.verkaufspreis if form else (item.verkaufspreis if item else '0.00')) }}" class="w-full border rounded px-3 py-2">
+      {% if errors.verkaufspreis %}<div class="text-xs text-red-600 mt-1">{{ errors.verkaufspreis }}</div>{% endif %}
     </div>
     <div>
-      <label class="block text-sm text-gray-600 mb-1">Einkaufspreis (CHF)</label>
-      <input type="number" name="ek" step="0.05" min="0" class="w-full border rounded-lg px-3 py-2">
+      <label class="block text-sm mb-1">Einkaufspreis (CHF)</label>
+      <input name="einkaufspreis" type="text" value="{{ (form.einkaufspreis if form else (item.einkaufspreis if item and item.einkaufspreis is not none else '0.00')) }}" class="w-full border rounded px-3 py-2">
+      {% if errors.einkaufspreis %}<div class="text-xs text-red-600 mt-1">{{ errors.einkaufspreis }}</div>{% endif %}
     </div>
   </div>
 
-  <div class="grid grid-cols-2 gap-3">
+  <div class="grid grid-cols-2 gap-4">
     <div>
-      <label class="block text-sm text-gray-600 mb-1">Steuer-Code *</label>
-      <select name="steuer_code" required class="w-full border rounded-lg px-3 py-2">
-        {% for code in tax_codes %}<option value="{{ code }}">{{ code }}</option>{% endfor %}
+      <label class="block text-sm mb-1">Steuer-Code *</label>
+      {% set sc = (form.steuer_code if form else (item.steuer_code if item else 'CH-7.7')) %}
+      <select name="steuer_code" class="w-full border rounded px-3 py-2">
+        {% for code in tax_codes %}<option value="{{ code }}" {% if code==sc %}selected{% endif %}>{{ code }}</option>{% endfor %}
+        {% if sc not in tax_codes %}<option value="{{ sc }}" selected>{{ sc }}</option>{% endif %}
       </select>
+      {% if errors.steuer_code %}<div class="text-xs text-red-600 mt-1">{{ errors.steuer_code }}</div>{% endif %}
     </div>
     <div>
-      <label class="block text-sm text-gray-600 mb-1">Lagerbestand</label>
-      <input type="number" name="lager" step="1" min="0" class="w-full border rounded-lg px-3 py-2">
+      <label class="block text-sm mb-1">Lagerbestand</label>
+      <input name="lagerbestand" type="number" min="0" step="1" value="{{ (form.lagerbestand if form else (item.lagerbestand if item and item.lagerbestand is not none else '0')) }}" class="w-full border rounded px-3 py-2">
+      {% if errors.lagerbestand %}<div class="text-xs text-red-600 mt-1">{{ errors.lagerbestand }}</div>{% endif %}
     </div>
   </div>
 
-  <div class="flex items-center">
-    <input type="checkbox" name="aktiv" value="1" checked class="mr-2">
-    <label>Aktiv</label>
-  </div>
-
-  <div class="pt-2 flex gap-2">
-    <button class="px-4 py-2 rounded-lg bg-gray-900 text-white">Speichern</button>
-    <a href="/ui/katalog" class="px-4 py-2 rounded-lg border">Abbrechen</a>
+  <div class="flex gap-2">
+    <button class="px-4 py-2 rounded bg-black text-white hover:bg-gray-800">Speichern</button>
+    <a href="/katalog" class="px-4 py-2 rounded border bg-white hover:bg-gray-50">Abbrechen</a>
   </div>
 </form>
 {% endblock %}

@@ -1,0 +1,22 @@
+{
+  "header_visibility": {
+    "/": 1,
+    "/pos": 1,
+    "/katalog": 1,
+    "/kalender": 0,
+    "/kunden": 1,
+    "/mitarbeiter": 0,
+    "/berichte": 1,
+    "/ausgaben": 1,
+    "/abschluss": 1,
+    "/gast_portal": 0,
+    "/einstellungen": 1
+  },
+  "dashboard_flags": {
+    "pos_quick": 1,
+    "termine_heute": 0,
+    "top_artikel": 1,
+    "umsatz_heute": 1,
+    "kassenbuch": 1
+  }
+}

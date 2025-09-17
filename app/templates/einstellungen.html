@@ -1,92 +1,72 @@
-<!-- kassensystem_basic/app/templates/einstellungen.html -->
-{% extends "base.html" %}
-{% block content %}
-<h2 class="text-xl font-semibold mb-4">Einstellungen</h2>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Einstellungen – Kassensystem Basic</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div class="max-w-5xl mx-auto px-4 py-6">
+    <h1 class="text-xl font-semibold mb-4">Einstellungen (DEV)</h1>
 
-<form method="post" action="/ui/einstellungen/save" class="space-y-6">
-  <!-- Zahlarten -->
-  <section class="bg-white border rounded-2xl p-4">
-    <div class="flex items-center justify-between mb-2">
-      <h3 class="font-semibold">Zahlarten</h3>
-      <span class="text-xs text-gray-500">aktiv/inaktiv</span>
-    </div>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-      {% set active = payments or [] %}
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="pay_bar" value="1" {% if 'bar' in active %}checked{% endif %}> Bar
-      </label>
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="pay_karte" value="1" {% if 'karte' in active %}checked{% endif %}> Karte
-      </label>
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="pay_twint" value="1" {% if 'twint' in active %}checked{% endif %}> TWINT
-      </label>
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="pay_rechnung" value="1" {% if 'rechnung' in active %}checked{% endif %}> Rechnung
-      </label>
-    </div>
-  </section>
+    {% if not dev %}
+      <div class="mb-6 p-4 rounded border bg-amber-50 border-amber-200 text-amber-800 text-sm">
+        Nicht im DEV-Modus. Schalte oben rechts mit <strong>DEV toggeln</strong> in den DEV-Modus, um Aenderungen zu aktivieren.
+      </div>
+    {% endif %}
 
-  <!-- Steuern -->
-  <section class="bg-white border rounded-2xl p-4">
-    <div class="flex items-center justify-between mb-2">
-      <h3 class="font-semibold">Mehrwertsteuer (JSON)</h3>
-      <span class="text-xs text-gray-500">Beispiel: {"CH-7.7": 0.077, "CH-2.6": 0.026}</span>
-    </div>
-    <textarea name="taxes_json" rows="6" class="w-full border rounded-lg px-3 py-2 font-mono text-sm">{{ taxes_json }}</textarea>
-  </section>
+    <form method="post" action="/einstellungen" class="space-y-8">
+      <!-- Navigation -->
+      <section class="bg-white rounded border p-4">
+        <h2 class="font-semibold mb-3">Navigation (Sichtbarkeit der Menuepunkte)</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {% for it in nav_base %}
+          <label class="flex items-center gap-2 text-sm border rounded p-2 bg-gray-50">
+            <input type="checkbox" name="nav_show" value="{{ it.href }}"
+                   {% if header_visibility.get(it.href, 1) %}checked{% endif %}
+                   class="scale-110">
+            <span>{{ it.label }}</span>
+            <span class="ml-auto text-xs text-gray-500">{{ it.href }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </section>
 
-  <!-- DEV-spezifisch -->
-  {% if dev %}
-  <section class="bg-white border rounded-2xl p-4">
-    <h3 class="font-semibold mb-2">DEV: Navigation</h3>
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
-      {% set current = current_nav | map(attribute='href') | list %}
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="nav_dashboard" value="1" {% if '/ui/dashboard' in current %}checked{% endif %}> Dashboard
-      </label>
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="nav_pos" value="1" {% if '/ui/pos' in current %}checked{% endif %}> Kasse
-      </label>
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="nav_kalender" value="1" {% if '/ui/kalender' in current %}checked{% endif %}> Kalender
-      </label>
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="nav_kunden" value="1" {% if '/ui/kunden' in current %}checked{% endif %}> Kunden
-      </label>
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="nav_katalog" value="1" {% if '/ui/katalog' in current %}checked{% endif %}> Katalog
-      </label>
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="nav_berichte" value="1" {% if '/ui/berichte' in current %}checked{% endif %}> Berichte
-      </label>
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="nav_abschluss" value="1" {% if '/ui/abschluss' in current %}checked{% endif %}> Abschluss
-      </label>
-      <label class="flex items-center gap-2 border rounded-lg p-2">
-        <input type="checkbox" name="nav_settings" value="1" {% if '/ui/einstellungen' in current %}checked{% endif %}> Einstellungen
-      </label>
-    </div>
-  </section>
+      <!-- Dashboard Kacheln -->
+      <section class="bg-white rounded border p-4">
+        <h2 class="font-semibold mb-3">Dashboard-Kacheln</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label class="flex items-center gap-2 text-sm border rounded p-2 bg-gray-50">
+            <input type="checkbox" name="flag_pos_quick" value="1" {% if flags.pos_quick %}checked{% endif %} class="scale-110">
+            <span>POS Schnellstart</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm border rounded p-2 bg-gray-50">
+            <input type="checkbox" name="flag_termine_heute" value="1" {% if flags.termine_heute %}checked{% endif %} class="scale-110">
+            <span>Termine heute</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm border rounded p-2 bg-gray-50">
+            <input type="checkbox" name="flag_top_artikel" value="1" {% if flags.top_artikel %}checked{% endif %} class="scale-110">
+            <span>Top Artikel</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm border rounded p-2 bg-gray-50">
+            <input type="checkbox" name="flag_umsatz_heute" value="1" {% if flags.umsatz_heute %}checked{% endif %} class="scale-110">
+            <span>Umsatz heute</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm border rounded p-2 bg-gray-50">
+            <input type="checkbox" name="flag_kassenbuch" value="1" {% if flags.kassenbuch %}checked{% endif %} class="scale-110">
+            <span>Kassenbuch</span>
+          </label>
+        </div>
+      </section>
 
-  <section class="bg-white border rounded-2xl p-4">
-    <h3 class="font-semibold mb-2">DEV: Dashboard-Kacheln</h3>
-    <p class="text-xs text-gray-500 mb-2">Die verfügbaren Flags werden dynamisch aus deinem Dashboard gelesen.</p>
-    <div class="grid grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-      {% for key, val in current_flags.items() %}
-        <label class="flex items-center gap-2 border rounded-lg p-2">
-          <input type="checkbox" name="flag_{{ key }}" value="1" {% if val %}checked{% endif %}> {{ key }}
-        </label>
-      {% endfor %}
-      {% if current_flags|length == 0 %}
-        <div class="text-sm text-gray-500">Keine Flags gefunden.</div>
-      {% endif %}
-    </div>
-  </section>
-  {% endif %}
-
-  <div class="pt-2">
-    <button class="px-4 py-2 rounded-lg bg-gray-900 text-white">Speichern</button>
+      <div class="flex gap-2">
+        <button class="px-4 py-2 rounded bg-black text-white hover:bg-gray-800" {% if not dev %}disabled{% endif %}>
+          Speichern
+        </button>
+        <a href="/" class="px-4 py-2 rounded border bg-white hover:bg-gray-50">Abbrechen</a>
+      </div>
+    </form>
   </div>
-</form>
-{% endblock %}
+</body>
+</html>

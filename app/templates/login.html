@@ -19,13 +19,11 @@
     <form method="post" action="/login" class="space-y-4">
       <div>
         <label class="block text-sm mb-1">E-Mail</label>
-        <input name="email" type="email" required class="w-full border rounded px-3 py-2"
-               placeholder="admin@example.com">
+        <input name="email" type="email" required class="w-full border rounded px-3 py-2 focus:outline-none focus:ring" placeholder="you@example.com">
       </div>
       <div>
         <label class="block text-sm mb-1">Passwort</label>
-        <input name="password" type="password" required class="w-full border rounded px-3 py-2"
-               placeholder="••••••••">
+        <input name="password" type="password" required class="w-full border rounded px-3 py-2 focus:outline-none focus:ring" placeholder="••••••••">
       </div>
       <button type="submit" class="w-full py-2 rounded bg-black text-white hover:bg-gray-800">Einloggen</button>
     </form>
