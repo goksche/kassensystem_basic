@@ -1,30 +1,31 @@
-﻿__pycache__/
-*.py[cod]
-*.pyo
-*.egg-info/
-.eggs/
-dist/
-build/
-*.log
-
+﻿# venv & caches
 .venv/
 venv/
-env/
-
-.pytest_cache/
-.coverage*
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pytest_cache/
+.coverage
 htmlcov/
 
+# IDE
 .idea/
 .vscode/
 
+# OS
 .DS_Store
+Thumbs.db
 
-.env
-*.env
+# logs & temp
+*.log
+*.tmp
+*.swp
 
+# build
+dist/
+build/
+
+# local data
 *.sqlite
-*.sqlite3
-*.db
-
-*.cache
+.env
