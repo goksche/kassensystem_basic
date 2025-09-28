@@ -1,31 +1,13 @@
-﻿# venv & caches
 .venv/
 venv/
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-*.pytest_cache/
-.coverage
-htmlcov/
-
-# IDE
 .idea/
 .vscode/
-
-# OS
 .DS_Store
 Thumbs.db
-
-# logs & temp
-*.log
-*.tmp
-*.swp
-
-# build
 dist/
 build/
-
-# local data
-*.sqlite
+*.log
 .env
+*.sqlite
