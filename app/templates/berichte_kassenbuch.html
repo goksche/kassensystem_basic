@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Berichte – Kassenbuch</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+{% include '_header.html' %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h5 m-0">Kassenbuch</h1>
+    <div class="d-flex gap-2">
+      <form class="d-flex gap-2" method="get" action="/berichte/kassenbuch">
+        <input class="form-control form-control-sm" type="date" name="von" value="{{ von or '' }}">
+        <input class="form-control form-control-sm" type="date" name="bis" value="{{ bis or '' }}">
+        <button class="btn btn-sm btn-primary" type="submit">Filtern</button>
+      </form>
+      <!-- PDF Export -->
+      <a class="btn btn-sm btn-outline-secondary"
+         href="/berichte/kassenbuch.pdf{% if von or bis %}?{% if von %}von={{ von }}{% endif %}{% if von and bis %}&{% endif %}{% if bis %}bis={{ bis }}{% endif %}{% endif %}">
+        Export PDF
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="p-3 bg-white rounded shadow-sm">
+        <div class="text-muted small">Belege</div>
+        <div class="h4">{{ belege }}</div>
+        <div class="text-muted small">Stornos: {{ storno_cnt }}</div>
+        <div class="text-muted small">Rabatte: {{ '%.2f'|format(rabatt_sum) }} CHF</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="p-3 bg-white rounded shadow-sm">
+        <div class="text-muted small">Umsätze je Steuersatz</div>
+        <div>S1 ({{ '%.1f'|format(r1) }}%): {{ '%.2f'|format(u_satz.S1) }} CHF</div>
+        <div>S2 ({{ '%.1f'|format(r2) }}%): {{ '%.2f'|format(u_satz.S2) }} CHF</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="p-3 bg-white rounded shadow-sm">
+        <div class="text-muted small">Zahlungsarten</div>
+        {% for k,v in zahlungen.items() %}
+          <div class="d-flex justify-content-between"><span class="text-capitalize">{{ k }}</span><span>{{ '%.2f'|format(v) }} CHF</span></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="p-3 bg-white rounded shadow-sm mt-3">
+    <div class="text-muted small mb-2">Verkäufe (neuste zuerst)</div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="text-muted">
+          <tr>
+            <th>Datum/Uhrzeit</th>
+            <th>Kasse</th>
+            <th class="text-end">Brutto (CHF)</th>
+            <th class="text-end">Rabatt</th>
+            <th>Zahlungen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sales %}
+            <tr>
+              <td>{{ s.ts.strftime('%d.%m.%Y %H:%M') }}</td>
+              <td>{{ s.kassen_id }}</td>
+              <td class="text-end">{{ '%.2f'|format(s.brutto_summe or 0) }}</td>
+              <td class="text-end">{{ '%.2f'|format(s.rabatt_summe or 0) }}</td>
+              <td>
+                {% for p in s.payments %}<span class="badge bg-light text-dark me-1">{{ p.art }} {{ '%.2f'|format(p.betrag) }}</span>{% endfor %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-3">Keine Daten im Zeitraum.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>

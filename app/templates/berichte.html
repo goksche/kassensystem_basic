@@ -1,93 +1,104 @@
-<!-- kassensystem_basic/app/templates/berichte.html -->
-{% extends "base.html" %}
-{% block content %}
-<h2 class="text-xl font-semibold mb-4">Berichte</h2>
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Berichte</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 m-0">Berichte</h1>
+    <a class="btn btn-outline-secondary" href="/">Dashboard</a>
+  </div>
 
-<div class="flex items-center gap-3 mb-4">
-  <label class="text-sm text-gray-600">Von</label>
-  <input id="from" type="date" value="{{ date_from }}" class="border rounded-lg px-3 py-2">
-  <label class="text-sm text-gray-600">Bis</label>
-  <input id="to" type="date" value="{{ date_to }}" class="border rounded-lg px-3 py-2">
-  <button id="btn-refresh" class="px-3 py-2 rounded-lg border">Aktualisieren</button>
-  <a id="btn-export" href="/ui/berichte/export?from={{ date_from }}&to={{ date_to }}" class="ml-auto px-3 py-2 rounded-lg border">CSV Export</a>
-</div>
-
-<div id="grid" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-  <section class="bg-white border rounded-2xl p-4">
-    <h3 class="font-semibold mb-2">Kennzahlen</h3>
-    <div class="text-sm space-y-1">
-      <div class="flex justify-between"><span>Umsatz (brutto)</span><span id="m-rev">CHF 0.00</span></div>
-      <div class="flex justify-between"><span>Trinkgeld</span><span id="m-tip">CHF 0.00</span></div>
-      <div class="flex justify-between"><span>MWST gesamt</span><span id="m-tax">CHF 0.00</span></div>
-      <div class="flex justify-between font-semibold border-t pt-2"><span>Ausgaben</span><span id="m-exp">CHF 0.00</span></div>
-      <div class="flex justify-between font-semibold"><span>Ergebnis</span><span id="m-net">CHF 0.00</span></div>
+  <form class="row g-2 mb-3" method="get" action="/berichte">
+    <div class="col-auto">
+      <label class="form-label">Von</label>
+      <input type="date" name="start" class="form-control" value="{{ start }}">
     </div>
-  </section>
+    <div class="col-auto">
+      <label class="form-label">Bis</label>
+      <input type="date" name="end" class="form-control" value="{{ end }}">
+    </div>
+    <div class="col-auto align-self-end">
+      <button class="btn btn-primary">Aktualisieren</button>
+    </div>
+  </form>
 
-  <section class="bg-white border rounded-2xl p-4">
-    <h3 class="font-semibold mb-2">Zahlarten</h3>
-    <div class="text-sm space-y-1" id="pay-list"></div>
-  </section>
+  {% if not has_sales %}
+  <div class="alert alert-info">
+    Es wurde keine <code>sales</code>-Tabelle gefunden. Berichte anzeigen wirksam,
+    sobald Verkäufe protokolliert werden. (Kein Schema geändert.)
+  </div>
+  {% endif %}
 
-  <section class="bg-white border rounded-2xl p-4">
-    <h3 class="font-semibold mb-2">Top 10 Artikel/Services</h3>
-    <div class="text-sm space-y-1" id="top-list"></div>
-  </section>
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <div class="text-muted small">Umsatz</div>
+          <div class="h4 m-0">{{ '%.2f'|format(total) }} CHF</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <div class="text-muted small">Transaktionen</div>
+          <div class="h4 m-0">{{ count }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-muted small mb-2">Zahlarten</div>
+          <div class="d-flex justify-content-between">
+            <div>Bar</div><div>{{ '%.2f'|format(sum_bar) }} CHF</div>
+          </div>
+          <div class="d-flex justify-content-between">
+            <div>Karte</div><div>{{ '%.2f'|format(sum_karte) }} CHF</div>
+          </div>
+          <div class="d-flex justify-content-between">
+            <div>Twint</div><div>{{ '%.2f'|format(sum_twint) }} CHF</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Datum/Zeit</th>
+            <th>Gesamt</th>
+            <th>Bar</th>
+            <th>Karte</th>
+            <th>Twint</th>
+            <th>Methode</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M:%S') if r.created_at.__class__.__name__ == 'datetime' else r.created_at }}</td>
+            <td>{{ '%.2f'|format(r.total) }}</td>
+            <td>{{ '%.2f'|format(r.bar) }}</td>
+            <td>{{ '%.2f'|format(r.karte) }}</td>
+            <td>{{ '%.2f'|format(r.twint) }}</td>
+            <td>{{ r.method }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="text-muted">Keine Verkäufe im Zeitraum.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
-
-<section class="bg-white border rounded-2xl p-4 mt-4">
-  <h3 class="font-semibold mb-2">Umsatz nach Tag</h3>
-  <div id="by-day" class="text-sm space-y-1"></div>
-</section>
-
-<script>
-function fmtCHF(x){ return 'CHF ' + Number(x || 0).toFixed(2); }
-const from = document.getElementById('from');
-const to = document.getElementById('to');
-const btnExport = document.getElementById('btn-export');
-
-async function loadReport(){
-  const f = from.value, t = to.value;
-  const res = await fetch('/api/reports/overview?from=' + encodeURIComponent(f) + '&to=' + encodeURIComponent(t));
-  const data = await res.json();
-
-  document.getElementById('m-rev').innerText = fmtCHF(data.umsatz_brutto);
-  document.getElementById('m-tip').innerText = fmtCHF(data.trinkgeld);
-  document.getElementById('m-tax').innerText = fmtCHF(data.mwst_summe);
-  document.getElementById('m-exp').innerText = fmtCHF(data.ausgaben_total);
-  document.getElementById('m-net').innerText = fmtCHF(data.ergebnis);
-
-  const payList = document.getElementById('pay-list'); payList.innerHTML='';
-  Object.entries(data.payments || {}).forEach(([k,v])=>{
-    const row = document.createElement('div');
-    row.className='flex justify-between';
-    row.innerHTML = `<span>${k.toUpperCase()}</span><span>${fmtCHF(v)}</span>`;
-    payList.appendChild(row);
-  });
-  if (!Object.keys(data.payments||{}).length){ payList.innerHTML='<div class="text-gray-500 text-sm">Keine Zahlungen im Zeitraum.</div>'; }
-
-  const top = document.getElementById('top-list'); top.innerHTML='';
-  (data.top || []).forEach(x=>{
-    const row = document.createElement('div');
-    row.className='flex justify-between';
-    row.innerHTML = `<span>${x.typ} • ${x.name}</span><span>${fmtCHF(x.umsatz)}</span>`;
-    top.appendChild(row);
-  });
-  if (!(data.top||[]).length){ top.innerHTML='<div class="text-gray-500 text-sm">Keine Positionen.</div>'; }
-
-  const byDay = document.getElementById('by-day'); byDay.innerHTML='';
-  (data.by_day || []).forEach(x=>{
-    const row = document.createElement('div');
-    row.className='flex justify-between';
-    row.innerHTML = `<span>${x.date}</span><span>${fmtCHF(x.amount)}</span>`;
-    byDay.appendChild(row);
-  });
-
-  btnExport.href = '/ui/berichte/export?from=' + encodeURIComponent(f) + '&to=' + encodeURIComponent(t);
-}
-document.getElementById('btn-refresh').onclick = loadReport;
-from.addEventListener('change', loadReport);
-to.addEventListener('change', loadReport);
-loadReport();
-</script>
-{% endblock %}
+</body>
+</html>

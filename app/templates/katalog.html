@@ -1,64 +1,117 @@
-{% extends "base.html" %}
-{% block content %}
-<h1 class="text-xl font-semibold mb-4">Katalog</h1>
-
-<form method="get" action="/katalog" class="mb-4 flex gap-2">
-  <input type="text" name="q" value="{{ q or '' }}" placeholder="Suche nach Name"
-         class="border rounded px-3 py-1 w-64">
-  <button class="px-3 py-1 rounded border bg-white hover:bg-gray-50">Suchen</button>
-  <a href="/katalog" class="px-3 py-1 rounded border bg-white hover:bg-gray-50">Zurücksetzen</a>
-  <div class="ml-auto flex gap-2">
-    <a href="/katalog/service/neu" class="px-3 py-1 rounded bg-black text-white hover:bg-gray-800">+ Service</a>
-    <a href="/katalog/produkt/neu" class="px-3 py-1 rounded bg-black text-white hover:bg-gray-800">+ Produkt</a>
-  </div>
-</form>
-
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-  <div class="bg-white border rounded">
-    <div class="px-4 py-3 border-b font-semibold">Services</div>
-    <div class="divide-y">
-      {% for s in services %}
-      <div class="px-4 py-3 flex items-center gap-3">
-        <div class="flex-1">
-          <div class="font-medium">{{ s.name }}</div>
-          <div class="text-xs text-gray-500">Dauer: {{ s.dauer_min }} min • Preis: CHF {{ '%.2f'|format(s.basispreis) }} • Steuer: {{ s.steuer_code }}</div>
-          {% if s.kategorie %}<div class="text-xs text-gray-400">Kategorie: {{ s.kategorie }}</div>{% endif %}
-        </div>
-        <span class="text-xs px-2 py-0.5 rounded {{ 'bg-emerald-100 text-emerald-800' if s.aktiv else 'bg-gray-100 text-gray-600' }}">{{ 'aktiv' if s.aktiv else 'inaktiv' }}</span>
-        <a href="/katalog/service/{{ s.id }}/bearbeiten" class="text-sm px-2 py-1 rounded border bg-white hover:bg-gray-50">Bearbeiten</a>
-        <form method="post" action="/katalog/service/{{ s.id }}/toggle">
-          <button class="text-sm px-2 py-1 rounded border bg-white hover:bg-gray-50">{{ 'Deaktivieren' if s.aktiv else 'Aktivieren' }}</button>
-        </form>
-      </div>
-      {% else %}
-      <div class="px-4 py-6 text-sm text-gray-500">Keine Services gefunden.</div>
-      {% endfor %}
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Katalog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 m-0">Katalog</h1>
+    <div class="btn-group">
+      <a class="btn btn-outline-primary" href="/katalog/service/neu">+ Service</a>
+      <a class="btn btn-outline-success" href="/katalog/produkt/neu">+ Produkt</a>
     </div>
   </div>
 
-  <div class="bg-white border rounded">
-    <div class="px-4 py-3 border-b font-semibold">Produkte</div>
-    <div class="divide-y">
-      {% for p in produkte %}
-      <div class="px-4 py-3 flex items-center gap-3">
-        <div class="flex-1">
-          <div class="font-medium">{{ p.name }}</div>
-          <div class="text-xs text-gray-500">
-            VK: CHF {{ '%.2f'|format(p.verkaufspreis) }}
-            {% if p.einkaufspreis is not none %} • EK: CHF {{ '%.2f'|format(p.einkaufspreis) }}{% endif %}
-            • Lager: {{ p.lagerbestand or 0 }} • Steuer: {{ p.steuer_code }}
+  <form class="row g-2 mb-3" method="get" action="/katalog">
+    <div class="col-sm-6 col-md-4">
+      <input class="form-control" type="text" name="q" placeholder="Suchen (Name)" value="{{ q or '' }}">
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-outline-secondary">Suchen</button>
+    </div>
+  </form>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <h5 class="card-title">Services</h5>
+            <a class="btn btn-sm btn-primary" href="/katalog/service/neu">Neu</a>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Name</th>
+                  <th class="text-end">Preis</th>
+                  <th style="width:1%"></th>
+                </tr>
+              </thead>
+              <tbody>
+              {% for s in services %}
+                <tr>
+                  <td>{{ s.name }}</td>
+                  <td class="text-end">
+                    {{
+                      '%.2f'|format(
+                        (s.basispreis if s.basispreis is not none else
+                         (s.preis if s.preis is not none else
+                          ((s.preis_cents/100.0) if s.preis_cents is not none else 0.0)))
+                      )
+                    }} CHF
+                  </td>
+                  <td><a class="btn btn-sm btn-outline-secondary" href="/katalog/service/{{ s.id }}">Bearbeiten</a></td>
+                </tr>
+              {% else %}
+                <tr><td colspan="3" class="text-muted">Keine Services.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
-        <span class="text-xs px-2 py-0.5 rounded {{ 'bg-emerald-100 text-emerald-800' if p.aktiv else 'bg-gray-100 text-gray-600' }}">{{ 'aktiv' if p.aktiv else 'inaktiv' }}</span>
-        <a href="/katalog/produkt/{{ p.id }}/bearbeiten" class="text-sm px-2 py-1 rounded border bg-white hover:bg-gray-50">Bearbeiten</a>
-        <form method="post" action="/katalog/produkt/{{ p.id }}/toggle">
-          <button class="text-sm px-2 py-1 rounded border bg-white hover:bg-gray-50">{{ 'Deaktivieren' if p.aktiv else 'Aktivieren' }}</button>
-        </form>
       </div>
-      {% else %}
-      <div class="px-4 py-6 text-sm text-gray-500">Keine Produkte gefunden.</div>
-      {% endfor %}
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <h5 class="card-title">Produkte</h5>
+            <a class="btn btn-sm btn-success" href="/katalog/produkt/neu">Neu</a>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Name</th>
+                  <th class="text-end">Preis</th>
+                  <th style="width:1%"></th>
+                </tr>
+              </thead>
+              <tbody>
+              {% for p in produkte %}
+                <tr>
+                  <td>{{ p.name }}</td>
+                  <td class="text-end">
+                    {{
+                      '%.2f'|format(
+                        (p.verkaufspreis if p.verkaufspreis is not none else
+                         (p.preis if p.preis is not none else
+                          ((p.preis_cents/100.0) if p.preis_cents is not none else 0.0)))
+                      )
+                    }} CHF
+                  </td>
+                  <td><a class="btn btn-sm btn-outline-secondary" href="/katalog/produkt/{{ p.id }}">Bearbeiten</a></td>
+                </tr>
+              {% else %}
+                <tr><td colspan="3" class="text-muted">Keine Produkte.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
+
+  <div class="mt-3">
+    <a class="btn btn-link" href="/">← Zurück</a>
+  </div>
 </div>
-{% endblock %}
+</body>
+</html>
