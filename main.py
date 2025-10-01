@@ -1,5 +1,22 @@
 from __future__ import annotations
 
+# =============================================================================
+# Kassensystem Basic – main.py (Charge 1 komplett, inkl. PDF-Export & POS-Fallback)
+# =============================================================================
+# Beinhaltet:
+# - DB-Modelle: Service, Produkt, Sale, SaleItem, SalePayment
+# - Katalog: CRUD für Services/Produkte (mit Warengruppe + Steuersatz)
+# - POS: Checkout (JSON ODER Form-Fallback), speichert Sales/Items/Payments
+# - Beleg-Preview (HTML)
+# - Einstellungen (Firma, MWST-Sätze, Kassen-ID)
+# - Berichte (HTML): Kassenbuch, Zahlungsarten, MWST/Warengruppen
+# - Berichte (PDF): /berichte/kassenbuch.pdf, /berichte/zahlungsarten.pdf, /berichte/mwst.pdf
+# - DEV-Toggle, Sessions, Static Mount, Templates
+#
+# PDF-Export benötigt "reportlab":
+#   pip install reportlab
+# =============================================================================
+
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
@@ -7,8 +24,10 @@ from pathlib import Path
 import json
 from typing import Optional
 
-from fastapi import FastAPI, Request, Depends, Form, status
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response, PlainTextResponse
+from fastapi import FastAPI, Request, Depends, Form
+from fastapi.responses import (
+    HTMLResponse, RedirectResponse, JSONResponse, Response, PlainTextResponse
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -20,38 +39,39 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session, relationship, sessionmaker, declarative_base
 
-# ------------------------------------------------------------------------------
-# DB Base
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# DB-Basis
+# -----------------------------------------------------------------------------
 Base = declarative_base()
-engine = create_engine("sqlite:///app/data/app.db", connect_args={"check_same_thread": False})
+DB_PATH = "sqlite:///app/data/app.db"
+engine = create_engine(DB_PATH, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# ------------------------------------------------------------------------------
-# Entities
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Entities – Katalog
+# -----------------------------------------------------------------------------
 class Service(Base):
     __tablename__ = "services"
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False)
-    basispreis = Column(Float, default=0.0)
-    steuer_code = Column(String(10), default="S1")      # S1=8.1%, S2=2.6%
+    basispreis = Column(Float, default=0.0)               # CHF brutto
+    steuer_code = Column(String(10), default="S1")        # S1=8.1%, S2=2.6%
     aktiv = Column(Boolean, default=True)
-    warengruppe = Column(String(4), default="DL")       # DL/PR/TA
+    warengruppe = Column(String(4), default="DL")         # DL/PR/TA
 
 class Produkt(Base):
     __tablename__ = "produkte"
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False)
-    verkaufspreis = Column(Float, default=0.0)
+    verkaufspreis = Column(Float, default=0.0)            # CHF brutto
     steuer_code = Column(String(10), default="S1")
     lagerbestand = Column(Integer, default=0)
     aktiv = Column(Boolean, default=True)
-    warengruppe = Column(String(4), default="PR")       # DL/PR/TA
+    warengruppe = Column(String(4), default="PR")         # DL/PR/TA
 
-# ------------------------------------------------------------------------------
-# Verkaufsjournal (Charge 1)
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Entities – Verkaufsjournal (Charge 1)
+# -----------------------------------------------------------------------------
 class Sale(Base):
     __tablename__ = "sales"
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -69,13 +89,13 @@ class SaleItem(Base):
     __tablename__ = "sale_items"
     id = Column(Integer, primary_key=True, autoincrement=True)
     sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
-    typ = Column(String(10), nullable=False)            # 'service'|'produkt'
-    ref_id = Column(Integer, nullable=False)
-    name_snapshot = Column(String(250), nullable=False)
+    typ = Column(String(10), nullable=False)              # 'service'|'produkt'
+    ref_id = Column(Integer, nullable=False)              # ID im Katalog
+    name_snapshot = Column(String(250), nullable=False)   # Name zum Zeitpunkt des Verkaufs
     menge = Column(Integer, default=1)
-    vk_brutto = Column(Float, default=0.0)
-    steuer_code = Column(String(10), default="S1")      # S1/S2
-    warengruppe = Column(String(4), default="DL")       # DL/PR/TA
+    vk_brutto = Column(Float, default=0.0)                # Einzelpreis brutto
+    steuer_code = Column(String(10), default="S1")        # S1/S2
+    warengruppe = Column(String(4), default="DL")         # DL/PR/TA
 
     sale = relationship("Sale", back_populates="items")
 
@@ -83,15 +103,15 @@ class SalePayment(Base):
     __tablename__ = "sale_payments"
     id = Column(Integer, primary_key=True, autoincrement=True)
     sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
-    art = Column(String(12), nullable=False)            # bar/karte/twint/gutschein/guthaben/offen
+    art = Column(String(12), nullable=False)              # bar/karte/twint/gutschein/guthaben/offen
     betrag = Column(Float, default=0.0)
 
     sale = relationship("Sale", back_populates="payments")
 
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # App / Templates / Middleware
-# ------------------------------------------------------------------------------
-APP_VERSION = "v0.44 + charge1 (pdf)"
+# -----------------------------------------------------------------------------
+APP_VERSION = "v0.44 + charge1 (PDF, POS-Fallback)"
 app = FastAPI(title="Kassensystem Basic")
 app.add_middleware(SessionMiddleware, secret_key="dev-secret", session_cookie="ksb_session")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -107,9 +127,9 @@ class CatalogAliasMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(CatalogAliasMiddleware)
 
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Settings (Datei)
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 SETTINGS_PATH = Path("app/data/settings.json")
 DEFAULT_SETTINGS = {
     "company": {
@@ -145,6 +165,9 @@ def vat_choices() -> list[tuple[str, str]]:
     r2 = float(cfg["vat"].get("rate2", 0.0))
     return [("S1", f"Satz 1 ({r1:.1f}%)"), ("S2", f"Satz 2 ({r2:.1f}%)")]
 
+# -----------------------------------------------------------------------------
+# Hilfen
+# -----------------------------------------------------------------------------
 def _to_cents(val):
     if val in (None, ""): return 0
     try:
@@ -155,9 +178,9 @@ def _to_cents(val):
 def _to_float(val) -> float:
     return float(_to_cents(val)) / 100.0
 
-# ------------------------------------------------------------------------------
-# DB Setup & Startup
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# DB-Setup
+# -----------------------------------------------------------------------------
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -171,9 +194,9 @@ def get_db():
 def _startup():
     Path("app/data").mkdir(parents=True, exist_ok=True)
 
-# ------------------------------------------------------------------------------
-# DEV Toggle / Header-Kontext
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# DEV Toggle & Template-Kontext
+# -----------------------------------------------------------------------------
 def _dev(request: Request) -> bool:
     v = request.session.get("dev")
     return bool(v) if v is not None else True  # default: DEV an
@@ -188,27 +211,26 @@ def dev_toggle(request: Request):
     return RedirectResponse(ref, status_code=303)
 
 def _ctx(request: Request, extra: Optional[dict] = None):
-    cfg = {
-        "DEV_MODE": _dev(request),
-        "APP_VERSION": APP_VERSION
-    }
-    base = {"request": request} | cfg
+    base = {"request": request, "DEV_MODE": _dev(request), "APP_VERSION": APP_VERSION}
     return base if not extra else base | extra
 
-# ------------------------------------------------------------------------------
-# Seiten
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Seiten: Dashboard
+# -----------------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", _ctx(request))
 
+# -----------------------------------------------------------------------------
 # Katalog
+# -----------------------------------------------------------------------------
 @app.get("/katalog", response_class=HTMLResponse)
 def katalog(request: Request, db: Session = Depends(get_db)):
     services = db.query(Service).order_by(Service.name.asc()).all()
     produkte = db.query(Produkt).order_by(Produkt.name.asc()).all()
     return templates.TemplateResponse("katalog.html", _ctx(request, {"services": services, "produkte": produkte}))
 
+# -- Service Neu/Bearbeiten
 @app.get("/katalog/service/neu", response_class=HTMLResponse)
 def service_new_form(request: Request):
     return templates.TemplateResponse("service_form.html",
@@ -224,8 +246,13 @@ def service_new_post(
     aktiv: bool = Form(False),
     db: Session = Depends(get_db),
 ):
-    item = Service(name=name.strip(), basispreis=_to_float(preis_chf),
-                   steuer_code=tax_code, warengruppe=warengruppe, aktiv=1 if aktiv else 0)
+    item = Service(
+        name=name.strip(),
+        basispreis=_to_float(preis_chf),
+        steuer_code=tax_code,
+        warengruppe=warengruppe,
+        aktiv=1 if aktiv else 0
+    )
     db.add(item); db.commit()
     return RedirectResponse("/katalog", status_code=302)
 
@@ -257,6 +284,7 @@ def service_edit_post(
     db.commit()
     return RedirectResponse("/katalog", status_code=302)
 
+# -- Produkt Neu/Bearbeiten
 @app.get("/katalog/produkt/neu", response_class=HTMLResponse)
 def produkt_new_form(request: Request):
     return templates.TemplateResponse("product_form.html",
@@ -272,8 +300,13 @@ def produkt_new_post(
     aktiv: bool = Form(False),
     db: Session = Depends(get_db),
 ):
-    item = Produkt(name=name.strip(), verkaufspreis=_to_float(preis_chf),
-                   steuer_code=tax_code, warengruppe=warengruppe, aktiv=1 if aktiv else 0)
+    item = Produkt(
+        name=name.strip(),
+        verkaufspreis=_to_float(preis_chf),
+        steuer_code=tax_code,
+        warengruppe=warengruppe,
+        aktiv=1 if aktiv else 0
+    )
     db.add(item); db.commit()
     return RedirectResponse("/katalog", status_code=302)
 
@@ -305,31 +338,49 @@ def produkt_edit_post(
     db.commit()
     return RedirectResponse("/katalog", status_code=302)
 
+# -----------------------------------------------------------------------------
 # POS
+# -----------------------------------------------------------------------------
 @app.get("/pos", response_class=HTMLResponse)
 def pos_page(request: Request, db: Session = Depends(get_db)):
     services = db.query(Service).filter(Service.aktiv==1).order_by(Service.name.asc()).all()
     produkte = db.query(Produkt).filter(Produkt.aktiv==1).order_by(Produkt.name.asc()).all()
-    return templates.TemplateResponse("pos.html",
-        _ctx(request, {"services": services, "produkte": produkte}))
+    return templates.TemplateResponse("pos.html", _ctx(request, {"services": services, "produkte": produkte}))
 
 @app.post("/pos/checkout")
 async def pos_checkout(request: Request, db: Session = Depends(get_db)):
-    payload = await request.json()
-    items = list(payload.get("items") or [])
-    pay = payload.get("payment") or {}
+    """
+    Nimmt JSON entgegen (Content-Type: application/json).
+    Fallback: Form-POST mit Feldern 'items' (JSON-String) und 'payment' (JSON-String).
+    """
+    items, pay = None, None
+    ctype = request.headers.get("content-type", "").lower()
+    if "application/json" in ctype:
+        payload = await request.json()
+        items = list(payload.get("items") or [])
+        pay = payload.get("payment") or {}
+    else:
+        form = await request.form()
+        try:
+            items = json.loads(form.get("items") or "[]")
+            pay = json.loads(form.get("payment") or "{}")
+        except Exception:
+            return JSONResponse({"ok": False, "error": "Ungültige Daten (Form/JSON)."}, status_code=400)
+
     if not items:
         return JSONResponse({"ok": False, "error": "Warenkorb ist leer."}, status_code=400)
 
     cfg = load_settings()
     kassen_id = cfg["kasse"].get("id", "K1")
 
+    # Normalisieren + Summe
     norm = []
     total = 0.0
     for r in items:
         t = (r.get("type") or "").lower().strip()
         iid = int(r.get("id") or 0); qty = int(r.get("qty") or 0)
-        if iid <= 0 or qty <= 0: return JSONResponse({"ok": False, "error":"Ungültige Position."}, status_code=400)
+        if iid <= 0 or qty <= 0:
+            return JSONResponse({"ok": False, "error":"Ungültige Position."}, status_code=400)
         if t == "service":
             s = db.query(Service).get(iid)
             if not s: return JSONResponse({"ok": False, "error":"Service nicht gefunden."}, status_code=400)
@@ -342,12 +393,14 @@ async def pos_checkout(request: Request, db: Session = Depends(get_db)):
         norm.append({"type":t,"id":iid,"qty":qty,"price":price,"total":lt,"tax_code":code,"grp":grp,"name":name})
 
     total = round(total, 2)
-    if total <= 0: return JSONResponse({"ok": False, "error":"Ungültiges Total."}, status_code=400)
+    if total <= 0:
+        return JSONResponse({"ok": False, "error":"Ungültiges Total."}, status_code=400)
 
     method = (pay.get("method") or "").lower().strip()
     am = pay.get("amounts") or {}
     bar = float(am.get("bar") or 0); karte = float(am.get("karte") or 0); twint = float(am.get("twint") or 0)
 
+    # Validierung
     if method not in {"bar","karte","twint","kombi"}:
         return JSONResponse({"ok": False, "error":"Ungültige Zahlart."}, status_code=400)
     if any(x<0 for x in (bar,karte,twint)):
@@ -365,8 +418,9 @@ async def pos_checkout(request: Request, db: Session = Depends(get_db)):
         if round(twint,2)!=total: return JSONResponse({"ok": False, "error":"Twintbetrag ≠ Total."}, status_code=400)
         bar=karte=0.0
 
+    # Persistenz
     sale = Sale(ts=datetime.utcnow(), kassen_id=kassen_id, brutto_summe=total, rabatt_summe=0.0, storno=False)
-    db.add(sale); db.flush()
+    db.add(sale); db.flush()  # ID verfügbar
 
     for n in norm:
         db.add(SaleItem(
@@ -388,7 +442,9 @@ async def pos_checkout(request: Request, db: Session = Depends(get_db)):
         "payment": {"method": method, "amounts":{"bar":round(bar,2),"karte":round(karte,2),"twint":round(twint,2)}}
     })
 
-# Beleg (unverändert)
+# -----------------------------------------------------------------------------
+# Beleg-Preview (HTML)
+# -----------------------------------------------------------------------------
 @app.post("/beleg/preview", response_class=HTMLResponse)
 async def beleg_preview(request: Request, db: Session = Depends(get_db)):
     payload = await request.json()
@@ -425,7 +481,9 @@ async def beleg_preview(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("beleg.html",
         {"request": request, "items": items, "total": total, "m": meta})
 
+# -----------------------------------------------------------------------------
 # Einstellungen
+# -----------------------------------------------------------------------------
 @app.get("/einstellungen", response_class=HTMLResponse)
 def settings_page(request: Request):
     return templates.TemplateResponse("einstellungen.html", _ctx(request, {"cfg": load_settings(), "saved": False}))
@@ -456,9 +514,9 @@ def settings_save(
     save_settings(cfg)
     return RedirectResponse("/einstellungen?saved=1", status_code=303)
 
-# ------------------------------------------------------------------------------
-# Berichte (Listen)
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Berichte (HTML)
+# -----------------------------------------------------------------------------
 def _parse_dates(von: str|None, bis: str|None):
     def _p(s):
         for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M"):
@@ -556,9 +614,9 @@ def rep_mwst(request: Request, von: str|None=None, bis: str|None=None, db: Sessi
                          "anteile": anteile, "von":von, "bis":bis})
     return templates.TemplateResponse("berichte_mwst.html", ctx)
 
-# ------------------------------------------------------------------------------
-# PDF-Export Helfer
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# PDF-Export (ReportLab)
+# -----------------------------------------------------------------------------
 def _pdf_response(buf: BytesIO, filename: str) -> Response:
     return Response(
         content=buf.getvalue(),
@@ -582,10 +640,9 @@ def _pdf_set_styles():
     styles = getSampleStyleSheet()
     return colors, A4, styles, mm, SimpleDocTemplate
 
-# Kassenbuch PDF
 @app.get("/berichte/kassenbuch.pdf")
 def rep_kassenbuch_pdf(request: Request, von: str|None=None, bis: str|None=None, db: Session = Depends(get_db)):
-    ok, err = _ensure_reportlab()
+    ok, _ = _ensure_reportlab()
     if not ok:
         return PlainTextResponse("PDF-Export benötigt 'reportlab' (pip install reportlab).", status_code=501)
 
@@ -595,7 +652,6 @@ def rep_kassenbuch_pdf(request: Request, von: str|None=None, bis: str|None=None,
     if dbis: q = q.filter(Sale.ts <= dbis)
     sales = q.order_by(Sale.ts.asc()).all()
 
-    # Aggregation wie HTML
     belege = len(sales)
     storno_cnt = sum(1 for s in sales if s.storno)
     rabatt_sum = round(sum(s.rabatt_summe or 0 for s in sales), 2)
@@ -617,12 +673,12 @@ def rep_kassenbuch_pdf(request: Request, von: str|None=None, bis: str|None=None,
     colors, A4, styles, mm, SimpleDocTemplate = _pdf_set_styles()
 
     buf = BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4,
-                            leftMargin=15*mm, rightMargin=15*mm,
-                            topMargin=12*mm, bottomMargin=12*mm)
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=15*mm, rightMargin=15*mm, topMargin=12*mm, bottomMargin=12*mm
+    )
     story = []
-    title = f"Kassenbuch ({von or '-'} bis {bis or '-'})"
-    story.append(Paragraph(title, styles["Title"]))
+    story.append(Paragraph(f"Kassenbuch ({von or '-'} bis {bis or '-'})", styles["Title"]))
     story.append(Spacer(1, 6))
 
     head = [
@@ -632,37 +688,45 @@ def rep_kassenbuch_pdf(request: Request, von: str|None=None, bis: str|None=None,
         [f"Umsatz S1 ({r1:.1f}%)", f"{u_satz['S1']:.2f}"],
         [f"Umsatz S2 ({r2:.1f}%)", f"{u_satz['S2']:.2f}"],
     ]
-    t1 = Table(head, colWidths=[70*mm, 40*mm])
-    t1.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.grey),
-                            ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke)]))
+    t1 = Table(head, colWidths=[80*mm, 50*mm])
+    t1.setStyle(TableStyle([
+        ("GRID",(0,0),(-1,-1),0.25,colors.grey),
+        ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke)
+    ]))
     story.append(t1)
     story.append(Spacer(1, 8))
 
     pay_rows = [["Zahlungsart", "Summe (CHF)"]] + [[k.capitalize(), f"{v:.2f}"] for k,v in zahlungen.items()]
-    t2 = Table(pay_rows, colWidths=[70*mm, 40*mm])
-    t2.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.grey),
-                            ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke)]))
+    t2 = Table(pay_rows, colWidths=[80*mm, 50*mm])
+    t2.setStyle(TableStyle([
+        ("GRID",(0,0),(-1,-1),0.25,colors.grey),
+        ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke)
+    ]))
     story.append(t2)
     story.append(Spacer(1, 8))
 
     rows = [["Datum/Uhrzeit","Kasse","Brutto (CHF)","Rabatt","Zahlungen"]]
     for s in sales:
         pays = ", ".join([f"{p.art}:{p.betrag:.2f}" for p in s.payments])
-        rows.append([s.ts.strftime("%d.%m.%Y %H:%M"), s.kassen_id, f"{(s.brutto_summe or 0):.2f}",
-                     f"{(s.rabatt_summe or 0):.2f}", pays or "-"])
-    t3 = Table(rows, colWidths=[35*mm, 20*mm, 30*mm, 25*mm, 60*mm], repeatRows=1)
-    t3.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.grey),
-                            ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke),
-                            ("ALIGN",(2,1),(3,-1),"RIGHT")]))
+        rows.append([
+            s.ts.strftime("%d.%m.%Y %H:%M"), s.kassen_id,
+            f"{(s.brutto_summe or 0):.2f}", f"{(s.rabatt_summe or 0):.2f}",
+            pays or "-"
+        ])
+    t3 = Table(rows, colWidths=[40*mm, 20*mm, 30*mm, 25*mm, 65*mm], repeatRows=1)
+    t3.setStyle(TableStyle([
+        ("GRID",(0,0),(-1,-1),0.25,colors.grey),
+        ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke),
+        ("ALIGN",(2,1),(3,-1),"RIGHT")
+    ]))
     story.append(t3)
 
     doc.build(story)
     return _pdf_response(buf, "kassenbuch.pdf")
 
-# Zahlungsarten PDF
 @app.get("/berichte/zahlungsarten.pdf")
 def rep_zahlungsarten_pdf(request: Request, von: str|None=None, bis: str|None=None, db: Session = Depends(get_db)):
-    ok, err = _ensure_reportlab()
+    ok, _ = _ensure_reportlab()
     if not ok:
         return PlainTextResponse("PDF-Export benötigt 'reportlab' (pip install reportlab).", status_code=501)
 
@@ -697,18 +761,19 @@ def rep_zahlungsarten_pdf(request: Request, von: str|None=None, bis: str|None=No
         rows.append([k.capitalize(), str(cnt), f"{summe:.2f}"])
     from reportlab.platypus import Table
     t = Table(rows, colWidths=[60*mm, 30*mm, 40*mm], repeatRows=1)
-    t.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.grey),
-                           ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke),
-                           ("ALIGN",(1,1),(-1,-1),"RIGHT")]))
+    t.setStyle(TableStyle([
+        ("GRID",(0,0),(-1,-1),0.25,colors.grey),
+        ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke),
+        ("ALIGN",(1,1),(-1,-1),"RIGHT")
+    ]))
     story.append(t)
 
     doc.build(story)
     return _pdf_response(buf, "zahlungsarten.pdf")
 
-# MWST/Warengruppen PDF
 @app.get("/berichte/mwst.pdf")
 def rep_mwst_pdf(request: Request, von: str|None=None, bis: str|None=None, db: Session = Depends(get_db)):
-    ok, err = _ensure_reportlab()
+    ok, _ = _ensure_reportlab()
     if not ok:
         return PlainTextResponse("PDF-Export benötigt 'reportlab' (pip install reportlab).", status_code=501)
 
@@ -752,9 +817,11 @@ def rep_mwst_pdf(request: Request, von: str|None=None, bis: str|None=None, db: S
         [f"S1 ({r1:.1f}%) Netto", f"{s1[0]:.2f}", "MWST", f"{s1[1]:.2f}", "Brutto", f"{s1[2]:.2f}"],
         [f"S2 ({r2:.1f}%) Netto", f"{s2[0]:.2f}", "MWST", f"{s2[1]:.2f}", "Brutto", f"{s2[2]:.2f}"],
     ], colWidths=[35*mm, 25*mm, 18*mm, 25*mm, 22*mm, 25*mm])
-    t1.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.grey),
-                            ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke),
-                            ("ALIGN",(1,0),(-1,-1),"RIGHT")]))
+    t1.setStyle(TableStyle([
+        ("GRID",(0,0),(-1,-1),0.25,colors.grey),
+        ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke),
+        ("ALIGN",(1,0),(-1,-1),"RIGHT")
+    ]))
     story.append(t1)
     story.append(Spacer(1, 8))
 
@@ -764,17 +831,19 @@ def rep_mwst_pdf(request: Request, von: str|None=None, bis: str|None=None, db: S
         ["PR", f"{groups['PR']:.2f}", f"{anteile['PR']:.1f}"],
         ["TA", f"{groups['TA']:.2f}", f"{anteile['TA']:.1f}"],
     ], colWidths=[40*mm, 40*mm, 30*mm], repeatRows=1)
-    t2.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.grey),
-                            ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke),
-                            ("ALIGN",(1,1),(-1,-1),"RIGHT")]))
+    t2.setStyle(TableStyle([
+        ("GRID",(0,0),(-1,-1),0.25,colors.grey),
+        ("BACKGROUND",(0,0),(-1,0),colors.whitesmoke),
+        ("ALIGN",(1,1),(-1,-1),"RIGHT")
+    ]))
     story.append(t2)
 
     doc.build(story)
     return _pdf_response(buf, "mwst_warengruppen.pdf")
 
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Dev-Server
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
