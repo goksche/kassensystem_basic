@@ -1,0 +1,31 @@
+<div class="border-bottom bg-white">
+  <div class="container-fluid px-3 py-2 d-flex align-items-center justify-content-between" style="max-width:1200px;">
+    <div class="fw-semibold">
+      Kassensystem Basic
+      {% if DEV_MODE %}<span class="badge bg-warning text-dark align-middle">DEV</span>{% endif %}
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <form method="post" action="/dev/toggle" class="m-0">
+        <button class="btn btn-outline-secondary btn-sm" type="submit">DEV toggeln</button>
+      </form>
+      <form method="post" action="/logout" class="m-0">
+        <button class="btn btn-outline-danger btn-sm" type="submit">Logout</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="container-fluid px-3 pb-2" style="max-width:1200px;">
+    <div class="btn-group flex-wrap" role="group" aria-label="Navigation">
+      <a class="btn btn-outline-secondary" href="/">Dashboard</a>
+      <a class="btn btn-outline-primary" href="/pos">Kasse</a>
+      <a class="btn btn-outline-primary" href="/katalog">Katalog</a>
+
+      <!-- Ausgaben VORÜBERGEHEND DEAKTIVIERT -->
+      <a class="btn btn-danger disabled" role="button" aria-disabled="true" tabindex="-1">Ausgaben</a>
+
+      <a class="btn btn-outline-primary" href="/einstellungen">Einstellungen</a>
+      <a class="btn btn-outline-primary" href="/berichte/kassenbuch">Berichte</a>
+      <a class="btn btn-danger disabled" role="button" aria-disabled="true" tabindex="-1">Abschluss</a>
+    </div>
+  </div>
+</div>

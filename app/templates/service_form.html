@@ -1,56 +1,56 @@
-{% extends "base.html" %}
-{% block content %}
-<h1 class="text-xl font-semibold mb-4">{{ 'Service bearbeiten' if item else 'Service anlegen' }}</h1>
-
-<form method="post" class="bg-white border rounded p-4 max-w-2xl space-y-4">
-  <div>
-    <label class="block text-sm mb-1">Name *</label>
-    <input name="name" value="{{ (form.name if form else (item.name if item else '')) }}" class="w-full border rounded px-3 py-2">
-    {% if errors.name %}<div class="text-xs text-red-600 mt-1">{{ errors.name }}</div>{% endif %}
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Service {{ 'anlegen' if mode == 'new' else 'bearbeiten' }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+{% include '_header.html' %}
+<div class="container py-4" style="max-width:700px;">
+  <a class="btn btn-link" href="/katalog">&larr; Zurück</a>
+  <div class="p-4 bg-white rounded shadow-sm">
+    <h1 class="h5 mb-3">Service {{ 'anlegen' if mode == 'new' else 'bearbeiten' }}</h1>
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">Name *</label>
+        <input class="form-control" type="text" name="name" required value="{{ '' if item is none else item.name }}">
+      </div>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Preis (CHF)</label>
+          <input class="form-control" type="number" name="preis_chf" step="0.01" min="0"
+                 value="{{ '0.00' if item is none else ('%.2f' % (item.basispreis or 0)) }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Steuersatz</label>
+          <select class="form-select" name="tax_code">
+            {% for code,label in vat_choices %}
+              <option value="{{ code }}" {% if item and item.steuer_code==code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Warengruppe</label>
+          <select class="form-select" name="warengruppe">
+            <option value="DL" {% if item and item.warengruppe=='DL' %}selected{% endif %}>Dienstleistungen</option>
+            <option value="PR" {% if item and item.warengruppe=='PR' %}selected{% endif %}>Produkte</option>
+            <option value="TA" {% if item and item.warengruppe=='TA' %}selected{% endif %}>Take-away (2.6%)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-check my-3">
+        <input class="form-check-input" type="checkbox" name="aktiv" id="activeChk"
+               {% if item is none or (item and item.aktiv) %}checked{% endif %}>
+        <label class="form-check-label" for="activeChk">Aktiv</label>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">Speichern</button>
+        <a class="btn btn-secondary" href="/katalog">Abbrechen</a>
+      </div>
+    </form>
   </div>
-
-  <div class="grid grid-cols-2 gap-4">
-    <div>
-      <label class="block text-sm mb-1">Dauer (Minuten) *</label>
-      <input name="dauer_min" type="number" min="1" step="1" value="{{ (form.dauer_min if form else (item.dauer_min if item else '60')) }}" class="w-full border rounded px-3 py-2">
-      {% if errors.dauer_min %}<div class="text-xs text-red-600 mt-1">{{ errors.dauer_min }}</div>{% endif %}
-    </div>
-    <div>
-      <label class="block text-sm mb-1">Basispreis (CHF) *</label>
-      <input name="basispreis" type="text" value="{{ (form.basispreis if form else (item.basispreis if item else '0.00')) }}" class="w-full border rounded px-3 py-2">
-      {% if errors.basispreis %}<div class="text-xs text-red-600 mt-1">{{ errors.basispreis }}</div>{% endif %}
-    </div>
-  </div>
-
-  <div class="grid grid-cols-2 gap-4">
-    <div>
-      <label class="block text-sm mb-1">Kategorie *</label>
-      {% set k = (form.kategorie if form else (item.kategorie if item else 'Service')) %}
-      <select name="kategorie" class="w-full border rounded px-3 py-2">
-        <option value="Service" {% if k=='Service' %}selected{% endif %}>Service</option>
-        <option value="Produkt" {% if k=='Produkt' %}selected{% endif %}>Produkt</option>
-      </select>
-    </div>
-    <div>
-      <label class="block text-sm mb-1">Steuer-Code *</label>
-      {% set sc = (form.steuer_code if form else (item.steuer_code if item else 'CH-7.7')) %}
-      <select name="steuer_code" class="w-full border rounded px-3 py-2">
-        {% for code in tax_codes %}<option value="{{ code }}" {% if code==sc %}selected{% endif %}>{{ code }}</option>{% endfor %}
-        {% if sc not in tax_codes %}<option value="{{ sc }}" selected>{{ sc }}</option>{% endif %}
-      </select>
-      {% if errors.steuer_code %}<div class="text-xs text-red-600 mt-1">{{ errors.steuer_code }}</div>{% endif %}
-    </div>
-  </div>
-
-  <div>
-    <label class="block text-sm mb-1">Materialkosten (CHF)</label>
-    <input name="materialkosten" type="text" value="{{ (form.materialkosten if form else (item.materialkosten if item and item.materialkosten is not none else '0.00')) }}" class="w-full border rounded px-3 py-2">
-    {% if errors.materialkosten %}<div class="text-xs text-red-600 mt-1">{{ errors.materialkosten }}</div>{% endif %}
-  </div>
-
-  <div class="flex gap-2">
-    <button class="px-4 py-2 rounded bg-black text-white hover:bg-gray-800">Speichern</button>
-    <a href="/katalog" class="px-4 py-2 rounded border bg-white hover:bg-gray-50">Abbrechen</a>
-  </div>
-</form>
-{% endblock %}
+</div>
+</body>
+</html>
