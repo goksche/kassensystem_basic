@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Tagesabschluss</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root{ --fg:#1d1d1f; --muted:#69707a; --rule:#e6e8eb; --accent:#0d6efd; }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; padding:0; color:var(--fg); font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif; }
+    .page{ max-width:960px; margin:24px auto; padding:24px; background:#fff; }
+    h1{ font-size:1.35rem; margin:0 0 .25rem 0; }
+    h2{ font-size:1.05rem; margin:1.25rem 0 .25rem 0; color:var(--muted); font-weight:600; }
+    .muted{ color:var(--muted); }
+    .small{ font-size:.9rem; }
+    .rule{ height:1px; background:var(--rule); margin:12px 0; }
+    .kv{ display:flex; flex-wrap:wrap; gap:12px 24px; }
+    .kv > div{ min-width:240px; }
+    .row{ display:flex; flex-wrap:wrap; gap:16px; align-items:start; }
+    .col{ flex:1 1 280px; }
+    .right{ text-align:right; }
+    .grid{ display:grid; grid-template-columns:1fr auto; gap:.35rem .75rem; align-items:baseline; }
+    .bold{ font-weight:700; }
+    .btnbar{ display:flex; gap:.5rem; justify-content:flex-end; margin-bottom:12px; }
+    .btn{
+      appearance:none; border:1px solid var(--rule); background:#f8f9fb;
+      padding:.5rem .75rem; border-radius:8px; cursor:pointer;
+    }
+    .btn-primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
+    .mt-16{ margin-top:16px; }
+
+    @media print{
+      .btnbar{ display:none }
+      .page{ margin:0; padding:0; }
+      @page{ margin:12mm; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="btnbar">
+    <button class="btn" onclick="window.history.back?.()">Schließen</button>
+    <button class="btn btn-primary" onclick="window.print()">Drucken</button>
+  </div>
+
+  {% macro chf(v) -%}
+    {{ "{:,.2f}".format(v|float)
+        |replace(",", "X")
+        |replace(".", ",")
+        |replace("X", "'") }}
+  {%- endmacro %}
+
+  <h1 class="mt-0">TAGESABSCHLUSS (Z) – {{ salon_name }} | {{ mwst_uid }}</h1>
+  <div class="kv small muted">
+    <div><span class="bold">Datum:</span> {{ datum_zeit }}</div>
+    <div><span class="bold">Kasse:</span> {{ kasse_id }}</div>
+    <div><span class="bold">Zeitraum:</span> {{ zeitraum }}</div>
+    <div><span class="bold">Schicht:</span> {{ schicht }}</div>
+  </div>
+  <div class="rule"></div>
+
+  <div class="grid">
+    <div class="bold">Umsatz gesamt:</div>
+    <div class="right">Brutto {{ chf(totals.brutto) }} | Netto {{ chf(totals.netto) }} | MWST {{ chf(totals.mwst) }}</div>
+
+    <div>Warengruppen:</div>
+    <div class="right">DL {{ chf(warengruppen.DL) }} | Produkte {{ chf(warengruppen.Produkte) }}</div>
+
+    <div>Steuersätze:</div>
+    <div class="right">
+      {% for s in steuersaetze %}
+        {{ '%.1f' % s.satz }}% Netto {{ chf(s.netto) }} MWST {{ chf(s.mwst) }}{% if not loop.last %} | {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="grid">
+    <div>Belege:</div><div class="right">{{ belege_count }} | Durchschnittsbon: {{ chf(bon_avg) }}</div>
+    <div>Rabatte:</div><div class="right">{{ rabatte.count }} Belege / {{ chf(rabatte.summe) }}</div>
+    <div>Stornos:</div><div class="right">{{ stornos.count }} / {{ chf(stornos.summe) }}{% if stornos.detail %} ({{ stornos.detail }}){% endif %}</div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="row">
+    <div class="col">
+      <h2>Zahlungsarten</h2>
+      <div class="grid">
+        <div>Bar</div><div class="right">{{ chf(zahlungen.bar) }}</div>
+        <div>Karte</div><div class="right">{{ chf(zahlungen.karte) }}</div>
+        <div>TWINT</div><div class="right">{{ chf(zahlungen.twint) }}</div>
+        <div>Gutschein</div><div class="right">{{ chf(zahlungen.gutschein) }}</div>
+      </div>
+    </div>
+    <div class="col">
+      <h2>Kassensturz</h2>
+      <div class="grid">
+        <div>Anfang</div><div class="right">{{ chf(kassensturz.anfang) }}</div>
+        <div>Einlagen</div><div class="right">{{ chf(kassensturz.einlagen) }}</div>
+        <div>Auslagen</div><div class="right">-{{ chf(kassensturz.auslagen) }}</div>
+        <div>End</div><div class="right">{{ chf(kassensturz.end) }}</div>
+      </div>
+      <div class="grid mt-16">
+        <div class="bold">Soll-Bar</div><div class="right bold">{{ chf(kassensturz.soll_bar) }}</div>
+        <div class="bold">Ist-Bar</div><div class="right bold">{{ chf(kassensturz.ist_bar) }}</div>
+        <div class="bold">Differenz</div>
+        <div class="right bold" style="color:{{ kassensturz.diff|float==0 and '#198754' or '#b8272c' }}">
+          {{ kassensturz.diff|float>=0 and '' or '-' }}{{ chf(kassensturz.diff|abs) }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="row">
+    <div class="col">
+      <h2>Mitarbeiter (DL-Umsatz)</h2>
+      <div class="grid">
+        {% for m in mitarbeiter %}
+          <div>{{ m.name }}</div><div class="right">{{ chf(m.dl_umsatz) }}</div>
+        {% else %}
+          <div class="muted small">– keine Mitarbeiter-Auswertung in dieser Version –</div><div></div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="col">
+      <h2>Trinkgeld</h2>
+      <div class="grid">
+        <div>Bar</div><div class="right">{{ chf(trinkgeld.bar) }}</div>
+        <div>Bargeldlos</div><div class="right">{{ chf(trinkgeld.cashless) }}</div>
+      </div>
+      <div class="small muted mt-16">Verteilung: {{ trinkgeld.verteilung }}</div>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="row">
+    <div class="col">
+      <h2>Gutscheine / Abos</h2>
+      <div class="grid">
+        <div>verkauft</div><div class="right">{{ chf(gutscheine.verkauft) }}</div>
+        <div>eingelöst</div><div class="right">{{ chf(gutscheine.eingeloest) }}</div>
+        <div>Restwert gesamt</div><div class="right">{{ chf(gutscheine.restwert) }}</div>
+      </div>
+    </div>
+    <div class="col">
+      <h2>Prüfungen</h2>
+      <div class="grid">
+        <div>Terminal-/TWINT-Abschluss</div><div class="right">{{ checks.terminal }}</div>
+        <div>Offene Bons</div><div class="right">{{ checks.offene_bons }}</div>
+        <div>MWST-Check</div><div class="right">{{ checks.mwst }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="row mt-16">
+    <div class="col">
+      <div class="small muted">Unterschrift:</div>
+      <div style="height:48px;border-bottom:1px solid var(--rule);max-width:360px"></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

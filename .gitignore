@@ -1,5 +1,4 @@
 .venv/
-venv/
 __pycache__/
 *.pyc
 .idea/
@@ -8,6 +7,6 @@ __pycache__/
 Thumbs.db
 dist/
 build/
-*.log
 .env
 *.sqlite
+db/*.db
