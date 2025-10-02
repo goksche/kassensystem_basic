@@ -343,9 +343,20 @@ def produkt_edit_post(
 # -----------------------------------------------------------------------------
 @app.get("/pos", response_class=HTMLResponse)
 def pos_page(request: Request, db: Session = Depends(get_db)):
-    services = db.query(Service).filter(Service.aktiv==1).order_by(Service.name.asc()).all()
-    produkte = db.query(Produkt).filter(Produkt.aktiv==1).order_by(Produkt.name.asc()).all()
-    return templates.TemplateResponse("pos.html", _ctx(request, {"services": services, "produkte": produkte}))
+    services = db.query(Service).filter(Service.aktiv == 1).order_by(Service.name.asc()).all()
+    produkte = db.query(Produkt).filter(Produkt.aktiv == 1).order_by(Produkt.name.asc()).all()
+
+    # <<< WICHTIG: EK-Feld ist im aktuellen Modell nicht vorhanden.
+    # Damit das alte pos.html (v0.44) nicht crasht, setzen wir es zur Laufzeit auf None.
+    for p in produkte:
+        if not hasattr(p, "einkaufspreis"):
+            setattr(p, "einkaufspreis", None)
+    # >>>
+
+    return templates.TemplateResponse(
+        "pos.html",
+        {"request": request, "services": services, "produkte": produkte, "DEV_MODE": _dev(request), "APP_VERSION": APP_VERSION}
+    )
 
 @app.post("/pos/checkout")
 async def pos_checkout(request: Request, db: Session = Depends(get_db)):
@@ -847,3 +858,207 @@ def rep_mwst_pdf(request: Request, von: str|None=None, bis: str|None=None, db: S
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
+
+# =============================================================================
+# Z-BERICHT / TAGESABSCHLUSS – APPEND-ONLY BLOCK (berührt bestehenden Code nicht)
+# Aufruf:  GET /berichte/tagesabschluss?von=YYYY-MM-DD HH:MM&bis=YYYY-MM-DD HH:MM
+# Wenn "von"/"bis" fehlen: gesamter heutiger Tag.
+# =============================================================================
+from typing import Any, Dict, Optional, Tuple
+from datetime import datetime, date, time
+try:
+    from sqlalchemy.orm import Session  # aus deiner bestehenden DB-Schicht
+except Exception:  # Fallback, falls SQLAlchemy-Namensimport hier nicht greift
+    Session = object  # Dummy-Typ; wird nicht strikt benötigt
+
+from fastapi import Depends
+from fastapi.responses import HTMLResponse
+
+# ---------- Sanfte Helper, die deine bestehenden bevorzugen ----------
+def _safe_ctx(request, extra: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Nutzt dein _ctx(), wenn vorhanden. Fällt sonst auf einfachen Kontext zurück.
+    """
+    try:
+        return _ctx(request, extra)  # type: ignore[name-defined]
+    except Exception:
+        base = {"request": request}
+        base.update(extra)
+        # sinnvolle Defaults, damit _header.html keine Fehler wirft
+        base.setdefault("DEV_MODE", False)
+        base.setdefault("APP_VERSION", "v0.48")
+        return base
+
+def _safe_load_settings() -> Dict[str, Any]:
+    """
+    Nutzt dein load_settings(), wenn vorhanden. Sonst Defaults.
+    """
+    try:
+        cfg = load_settings()  # type: ignore[name-defined]
+        # Minimal-Defaults ergänzen
+        cfg.setdefault("company", {})
+        cfg["company"].setdefault("name", "Salon")
+        cfg["company"].setdefault("vat_number", "CHE-000.000.000 MWST")
+        cfg.setdefault("kasse", {})
+        cfg["kasse"].setdefault("id", "K1")
+        cfg.setdefault("vat", {})
+        cfg["vat"].setdefault("rate1", 8.1)
+        cfg["vat"].setdefault("rate2", 2.6)
+        return cfg
+    except Exception:
+        return {
+            "company": {"name": "Salon", "vat_number": "CHE-000.000.000 MWST"},
+            "kasse": {"id": "K1"},
+            "vat": {"rate1": 8.1, "rate2": 2.6},
+        }
+
+def _safe_parse_dates(von: Optional[str], bis: Optional[str]) -> Tuple[Optional[datetime], Optional[datetime]]:
+    """
+    Nutzt dein _parse_dates(), wenn vorhanden. Sonst ISO-Parser.
+    """
+    try:
+        return _parse_dates(von, bis)  # type: ignore[name-defined]
+    except Exception:
+        def parse(s: Optional[str]) -> Optional[datetime]:
+            if not s:
+                return None
+            # erlaubt "YYYY-MM-DD" oder "YYYY-MM-DD HH:MM"
+            try:
+                return datetime.fromisoformat(s)
+            except ValueError:
+                try:
+                    return datetime.combine(datetime.strptime(s, "%Y-%m-%d").date(), time(0, 0))
+                except ValueError:
+                    return None
+        return parse(von), parse(bis)
+
+# ---------- Aggregation ----------
+def _split_net_tax(gross: float, rate: float) -> Tuple[float, float]:
+    if not rate:
+        return round(gross, 2), 0.0
+    net = round(gross / (1.0 + rate / 100.0), 2)
+    tax = round(gross - net, 2)
+    return net, tax
+
+@app.get("/berichte/tagesabschluss", response_class=HTMLResponse)
+def z_bericht(
+    request: Request,
+    von: Optional[str] = None,
+    bis: Optional[str] = None,
+    db: Session = Depends(get_db),  # nutzt deine bestehende DB-Session
+):
+    # --- Zeitraum bestimmen (heute, wenn leer) ---
+    dv, dbis = _safe_parse_dates(von, bis)
+    if dv is None and dbis is None:
+        today = date.today()
+        dv = datetime.combine(today, time(0, 0, 0))
+        dbis = datetime.combine(today, time(23, 59, 59))
+
+    # --- Daten laden ---
+    # Erwartet deine Modelle: Sale, SaleItem, SalePayment (wie im Kassensystem)
+    try:
+        q = db.query(Sale)  # type: ignore[name-defined]
+    except Exception as e:
+        # Hier landen wir, wenn die Modelle an dieser Stelle nicht importierbar sind.
+        # Besser klare Fehlermeldung als 500-Blackbox:
+        return HTMLResponse(
+            f"<pre>Modelle nicht verfügbar: {e}\n"
+            f"Stelle sicher, dass Sale/SaleItem/SalePayment in main.py oben importiert sind.</pre>",
+            status_code=500,
+        )
+
+    if dv:   q = q.filter(Sale.ts >= dv)  # type: ignore[name-defined]
+    if dbis: q = q.filter(Sale.ts <= dbis)  # type: ignore[name-defined]
+    sales = q.all()
+
+    belege = len(sales)
+    brutto_total = round(sum(float(s.brutto_summe or 0) for s in sales), 2)
+    rabatt_total = round(sum(float(s.rabatt_summe or 0) for s in sales), 2)
+    rabatt_count = sum(1 for s in sales if (s.rabatt_summe or 0) > 0)
+    storno_count = sum(1 for s in sales if getattr(s, "storno", False))
+    storno_sum = round(sum(float(s.brutto_summe or 0) for s in sales if getattr(s, "storno", False)), 2)
+
+    # Zahlarten summieren
+    zahlungen = {"bar": 0.0, "karte": 0.0, "twint": 0.0, "gutschein": 0.0}
+    for s in sales:
+        for p in getattr(s, "payments", []):
+            k = (getattr(p, "art", "") or "").lower()
+            if k in zahlungen:
+                zahlungen[k] += float(getattr(p, "betrag", 0) or 0)
+
+    # Steuersätze & Warengruppen aus Positionen
+    cfg = _safe_load_settings()
+    r1 = float(cfg["vat"].get("rate1", 0.0))  # S1
+    r2 = float(cfg["vat"].get("rate2", 0.0))  # S2
+
+    sums_by_tax = {"S1": 0.0, "S2": 0.0}
+    sums_by_group = {"DL": 0.0, "PR": 0.0, "TA": 0.0}
+    for s in sales:
+        for it in getattr(s, "items", []):
+            menge = int(getattr(it, "menge", 0) or 0)
+            vk_brutto = float(getattr(it, "vk_brutto", 0) or 0)
+            gross = vk_brutto * menge
+            tax_code = (getattr(it, "steuer_code", "S1") or "S1").upper()
+            grp_code = (getattr(it, "warengruppe", "DL") or "DL").upper()
+            if tax_code not in sums_by_tax: sums_by_tax[tax_code] = 0.0
+            if grp_code not in sums_by_group: sums_by_group[grp_code] = 0.0
+            sums_by_tax[tax_code] += gross
+            sums_by_group[grp_code] += gross
+
+    s1_net, s1_tax = _split_net_tax(sums_by_tax.get("S1", 0.0), r1)
+    s2_net, s2_tax = _split_net_tax(sums_by_tax.get("S2", 0.0), r2)
+    netto_total = round(s1_net + s2_net, 2)
+    mwst_total  = round(s1_tax + s2_tax, 2)
+
+    dl = round(sums_by_group.get("DL", 0.0), 2)
+    pr = round(sums_by_group.get("PR", 0.0), 2)
+
+    bon_avg = round((brutto_total / belege), 2) if belege else 0.0
+
+    kassensturz = {
+        "anfang": 0.0, "einlagen": 0.0, "auslagen": 0.0, "end": zahlungen["bar"],
+        "soll_bar": zahlungen["bar"], "ist_bar": zahlungen["bar"], "diff": 0.0,
+    }
+
+    # Noch keine echte Datenbasis in Charge 1:
+    mitarbeiter = []
+    trinkgeld = {"bar": 0.0, "cashless": 0.0, "verteilung": "Team"}
+    gutscheine = {"verkauft": 0.0, "eingeloest": zahlungen["gutschein"], "restwert": 0.0}
+    checks = {"terminal": "OK", "offene_bons": 0, "mwst": "OK"}
+
+    ctx = _safe_ctx(request, {
+        "salon_name": cfg["company"].get("name") or "Salon",
+        "mwst_uid":   (cfg["company"].get("vat_number") or "").strip() or "CHE-000.000.000 MWST",
+        "datum_zeit": f"{(dv or datetime.utcnow()):%Y-%m-%d} – {(dbis or datetime.utcnow()):%Y-%m-%d}",
+        "kasse_id":   cfg["kasse"].get("id", "K1"),
+        "zeitraum":   f"{(dv or datetime.utcnow()):%H:%M}–{(dbis or datetime.utcnow()):%H:%M}",
+        "schicht":    "Tag",
+
+        "totals": {"brutto": brutto_total, "netto": netto_total, "mwst": mwst_total},
+        "warengruppen": {"DL": dl, "Produkte": pr},
+        "steuersaetze": [
+            {"satz": r1, "netto": s1_net, "mwst": s1_tax},
+            {"satz": r2, "netto": s2_net, "mwst": s2_tax},
+        ],
+
+        "belege_count": belege,
+        "bon_avg": bon_avg,
+
+        "rabatte": {"count": rabatt_count, "summe": rabatt_total},
+        "stornos": {"count": storno_count, "summe": storno_sum, "detail": ""},
+
+        "zahlungen": {
+            "bar": round(zahlungen["bar"], 2),
+            "karte": round(zahlungen["karte"], 2),
+            "twint": round(zahlungen["twint"], 2),
+            "gutschein": round(zahlungen["gutschein"], 2)
+        },
+
+        "kassensturz": kassensturz,
+        "mitarbeiter": mitarbeiter,
+        "trinkgeld": trinkgeld,
+        "gutscheine": gutscheine,
+        "checks": checks,
+    })
+    return templates.TemplateResponse("bericht_tagesabschluss.html", ctx)

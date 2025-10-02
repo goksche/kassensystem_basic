@@ -1,303 +1,317 @@
-{% extends "base.html" %}
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Kasse</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-{% block content %}
-<h1 class="text-xl font-semibold mb-4">Kasse</h1>
+  <style>
+    /* Grid für gleich große, eckige Felder */
+    .pill-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+      gap:.6rem;
+    }
+    .pill{
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height:56px;                 /* EINHEITLICHE HÖHE */
+      padding:0 .75rem;
+      font-size:1rem;
+      line-height:1.2;
+      border-radius:0;             /* ECKIG */
+      border:1px solid rgba(0,0,0,.1);
+      user-select:none;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .pill.svc{ background:#0d6efd; color:#fff; }      /* Primary */
+    .pill.prd{ background:#6c757d; color:#fff; }      /* Secondary */
 
-<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    .cart-row + .cart-row{ border-top:1px solid #eee; }
+    .qty-btn{ width:2.1rem; }
+  </style>
+</head>
+<body class="bg-light">
+  {% include "_header.html" %}
 
-  <!-- Services -->
-  <section class="xl:col-span-1 bg-white border rounded">
-    <div class="px-4 py-3 border-b font-semibold">Services</div>
-    <div class="divide-y">
-      {% for s in services %}
-        <div class="px-4 py-3 flex items-center gap-3">
-          <div class="flex-1">
-            <div class="font-medium">{{ s.name }}</div>
-            <div class="text-xs text-gray-500">
-              Dauer: {{ s.dauer_min }} min • Preis: CHF {{ '%.2f'|format(s.basispreis) }} • Steuer: {{ s.steuer_code }}
+  <div class="container py-3">
+    <div class="row g-3">
+      <!-- Sortiment -->
+      <div class="col-12 col-lg-7">
+        <div class="card mb-3">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Dienstleistungen</h5>
+            <div class="pill-grid">
+              {% for s in services %}
+                <div class="pill svc"
+                     data-type="service"
+                     data-id="{{ s.id }}"
+                     data-name="{{ s.name }}"
+                     data-price="{{ '%.2f' % (s.basispreis or 0) }}"
+                     data-tax="{{ s.steuer_code or 'S1' }}"
+                     data-grp="{{ s.warengruppe or 'DL' }}">
+                  {{ s.name }} • {{ '%.2f' % (s.basispreis or 0) }} CHF
+                </div>
+              {% endfor %}
             </div>
-            {% if s.kategorie %}
-              <div class="text-xs text-gray-400">Kategorie: {{ s.kategorie }}</div>
-            {% endif %}
           </div>
-          <button type="button"
-                  class="text-sm px-2 py-1 rounded border bg-white hover:bg-gray-50"
-                  data-type="service"
-                  data-id="s-{{ s.id }}"
-                  data-name="{{ s.name }}"
-                  data-tax="{{ s.steuer_code }}"
-                  data-price="{{ '%.2f'|format(s.basispreis) }}">
-            Hinzufügen
-          </button>
         </div>
-      {% else %}
-        <div class="px-4 py-6 text-sm text-gray-500">Keine aktiven Services.</div>
-      {% endfor %}
-    </div>
-  </section>
 
-  <!-- Produkte -->
-  <section class="xl:col-span-1 bg-white border rounded">
-    <div class="px-4 py-3 border-b font-semibold">Produkte</div>
-    <div class="divide-y">
-      {% for p in produkte %}
-        <div class="px-4 py-3 flex items-center gap-3">
-          <div class="flex-1">
-            <div class="font-medium">{{ p.name }}</div>
-            <div class="text-xs text-gray-500">
-              VK: CHF {{ '%.2f'|format(p.verkaufspreis) }}
-              {% if p.einkaufspreis is not none %} • EK: CHF {{ '%.2f'|format(p.einkaufspreis) }}{% endif %}
-              • Lager: {{ p.lagerbestand or 0 }} • Steuer: {{ p.steuer_code }}
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Produkte</h5>
+            <div class="pill-grid">
+              {% for p in produkte %}
+                <div class="pill prd"
+                     data-type="produkt"
+                     data-id="{{ p.id }}"
+                     data-name="{{ p.name }}"
+                     data-price="{{ '%.2f' % (p.verkaufspreis or 0) }}"
+                     data-tax="{{ p.steuer_code or 'S1' }}"
+                     data-grp="{{ p.warengruppe or 'PR' }}">
+                  {{ p.name }} • {{ '%.2f' % (p.verkaufspreis or 0) }} CHF
+                </div>
+              {% endfor %}
             </div>
           </div>
-          <button type="button"
-                  class="text-sm px-2 py-1 rounded border bg-white hover:bg-gray-50"
-                  data-type="produkt"
-                  data-id="p-{{ p.id }}"
-                  data-name="{{ p.name }}"
-                  data-tax="{{ p.steuer_code }}"
-                  data-price="{{ '%.2f'|format(p.verkaufspreis) }}">
-            Hinzufügen
-          </button>
         </div>
-      {% else %}
-        <div class="px-4 py-6 text-sm text-gray-500">Keine aktiven Produkte.</div>
-      {% endfor %}
+      </div>
+
+      <!-- Warenkorb & Zahlung -->
+      <div class="col-12 col-lg-5">
+        <div class="card mb-3">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Warenkorb</h5>
+
+            <div id="cart_list" class="mb-3"></div>
+
+            <div class="d-flex justify-content-between">
+              <span class="fw-semibold">Total</span>
+              <span class="fw-bold fs-5"><span id="cart_total">0.00</span> CHF</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Zahlung</h5>
+
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="pay_method" id="pay_bar" value="bar" checked>
+              <label class="form-check-label" for="pay_bar">Bar</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="pay_method" id="pay_karte" value="karte">
+              <label class="form-check-label" for="pay_karte">Karte</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="pay_method" id="pay_twint" value="twint">
+              <label class="form-check-label" for="pay_twint">Twint</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="pay_method" id="pay_kombi" value="kombi">
+              <label class="form-check-label" for="pay_kombi">Kombi</label>
+            </div>
+
+            <div id="kombi_fields" class="row g-2 mt-2" style="display:none">
+              <div class="col-12 col-sm-4">
+                <label class="form-label mb-0">Bar (CHF)</label>
+                <input type="number" class="form-control" id="kombi_bar" step="0.05" min="0" value="0">
+              </div>
+              <div class="col-12 col-sm-4">
+                <label class="form-label mb-0">Karte (CHF)</label>
+                <input type="number" class="form-control" id="kombi_karte" step="0.05" min="0" value="0">
+              </div>
+              <div class="col-12 col-sm-4">
+                <label class="form-label mb-0">Twint (CHF)</label>
+                <input type="number" class="form-control" id="kombi_twint" step="0.05" min="0" value="0">
+              </div>
+              <div class="col-12">
+                <small id="kombi_hint" class="text-muted">Summe muss dem Total entsprechen.</small>
+              </div>
+            </div>
+
+            <div class="d-grid mt-3">
+              <button id="btn_pay" class="btn btn-primary btn-lg">Bezahlen</button>
+            </div>
+
+            <!-- Fallback (wird vom Script gefüllt, falls Fetch fehlschlägt) -->
+            <input type="hidden" id="hidden_items" name="items">
+            <input type="hidden" id="hidden_payment" name="payment">
+          </div>
+        </div>
+      </div>
     </div>
-  </section>
+  </div>
 
-  <!-- Warenkorb / Totals -->
-  <section class="xl:col-span-1 bg-white border rounded">
-    <div class="px-4 py-3 border-b font-semibold">Warenkorb</div>
+  <!-- JS -->
+  <script>
+  (function () {
+    // Interner Warenkorb
+    const cart = [];
 
-    <div id="cart-empty" class="p-4 text-sm text-gray-500">Noch keine Positionen. Füge links etwas hinzu.</div>
+    // Helfer
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => document.querySelectorAll(sel);
+    const num = (v) => Number((v ?? "0").toString().replace(",", ".")) || 0;
+    const fmt = (v) => (Number(v || 0).toFixed(2));
 
-    <div id="cart-list" class="divide-y hidden"></div>
-
-    <div class="p-4 border-t space-y-3">
-      <div class="grid grid-cols-3 gap-3 items-end">
-        <label class="text-sm">Rabatt (CHF)</label>
-        <input id="disc-abs" type="number" step="0.05" min="0" class="col-span-2 border rounded px-2 py-1" value="0">
-      </div>
-      <div class="grid grid-cols-3 gap-3 items-end">
-        <label class="text-sm">Rabatt (%)</label>
-        <input id="disc-pct" type="number" step="0.5" min="0" max="100" class="col-span-2 border rounded px-2 py-1" value="0">
-      </div>
-      <div class="grid grid-cols-3 gap-3 items-end">
-        <label class="text-sm">Trinkgeld (CHF)</label>
-        <input id="tip" type="number" step="0.05" min="0" class="col-span-2 border rounded px-2 py-1" value="0">
-      </div>
-
-      <div class="pt-3 border-t space-y-1 text-sm">
-        <div class="flex justify-between"><span>Zwischensumme</span><span id="sum-sub">CHF 0.00</span></div>
-        <div class="flex justify-between text-gray-600"><span>Rabatt</span><span id="sum-disc">– CHF 0.00</span></div>
-        <div class="flex justify-between text-gray-600"><span>Trinkgeld</span><span id="sum-tip">CHF 0.00</span></div>
-        <div class="flex justify-between"><span>Gesamt</span><span id="sum-total" class="font-semibold">CHF 0.00</span></div>
-      </div>
-
-      <div id="tax-breakdown" class="text-xs text-gray-600"></div>
-
-      <div class="pt-3 flex gap-2">
-        <button id="btn-clear" type="button" class="px-3 py-2 rounded border bg-white hover:bg-gray-50">Warenkorb leeren</button>
-        <!-- >>> Der gewünschte Button zum Buchen <<< -->
-        <button id="btn-book"  type="button" class="px-3 py-2 rounded bg-black text-white hover:bg-gray-800 disabled:opacity-40" disabled>
-          Buchen
-        </button>
-      </div>
-      <div id="book-msg" class="text-xs text-emerald-700 mt-2 hidden"></div>
-    </div>
-  </section>
-</div>
-
-<script>
-(function(){
-  const TAX = {"CH-7.7":0.077, "CH-2.6":0.026, "CH-0":0.0};
-
-  const cart = new Map();
-
-  const $  = (s, r=document)=>r.querySelector(s);
-  const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
-
-  const elEmpty   = $("#cart-empty");
-  const elList    = $("#cart-list");
-  const elSub     = $("#sum-sub");
-  const elDisc    = $("#sum-disc");
-  const elTip     = $("#sum-tip");
-  const elTotal   = $("#sum-total");
-  const elTax     = $("#tax-breakdown");
-  const inDiscAbs = $("#disc-abs");
-  const inDiscPct = $("#disc-pct");
-  const inTip     = $("#tip");
-  const btnClear  = $("#btn-clear");
-  const btnBook   = $("#btn-book");
-  const msg       = $("#book-msg");
-
-  let lastTotal = 0;
-
-  function fmt(n){ return "CHF " + n.toFixed(2); }
-
-  function render(){
-    if (cart.size === 0){
-      elEmpty.classList.remove("hidden");
-      elList.classList.add("hidden");
-      elList.innerHTML = "";
-      updateTotals();
-      return;
-    }
-    elEmpty.classList.add("hidden");
-    elList.classList.remove("hidden");
-
-    elList.innerHTML = "";
-    cart.forEach(item => {
-      const line = document.createElement("div");
-      line.className = "px-4 py-3 flex items-center gap-3";
-      line.innerHTML = `
-        <div class="flex-1">
-          <div class="font-medium">${item.name}</div>
-          <div class="text-xs text-gray-500">Steuer: ${item.tax} • Einzel: ${fmt(item.price)}</div>
-        </div>
-        <div class="flex items-center gap-1">
-          <button class="px-2 py-1 border rounded" data-act="dec" data-key="${item.key}">−</button>
-          <input class="w-12 text-center border rounded py-1" data-act="qty" data-key="${item.key}" value="${item.qty}">
-          <button class="px-2 py-1 border rounded" data-act="inc" data-key="${item.key}">+</button>
-        </div>
-        <div class="w-28 text-right">${fmt(item.price * item.qty)}</div>
-        <button class="ml-2 px-2 py-1 border rounded bg-white hover:bg-gray-50" data-act="rm" data-key="${item.key}">Entfernen</button>
-      `;
-      elList.appendChild(line);
-    });
-
-    updateTotals();
-  }
-
-  function addItem({id,name,price,tax}){
-    const key = id;
-    const ex = cart.get(key);
-    if (ex){ ex.qty += 1; }
-    else   { cart.set(key, {key,id,name,price:parseFloat(price),tax,qty:1}); }
-    render();
-  }
-
-  function updateTotals(){
-    let sub = 0;
-    const taxBuckets = {};
-    cart.forEach(it=>{
-      const line = it.price * it.qty;
-      sub += line;
-      const rate = TAX[it.tax] ?? 0;
-      taxBuckets[it.tax] = (taxBuckets[it.tax] || 0) + (line * rate / (1 + rate));
-    });
-
-    const discAbs = Math.max(0, parseFloat(inDiscAbs.value || "0"));
-    const discPct = Math.max(0, Math.min(100, parseFloat(inDiscPct.value || "0")));
-    const discPctAmt = sub * (discPct/100);
-    const disc = Math.min(sub, discAbs + discPctAmt);
-
-    const tip = Math.max(0, parseFloat(inTip.value || "0"));
-    const total = Math.max(0, sub - disc) + tip;
-
-    elSub.textContent   = fmt(sub);
-    elDisc.textContent  = "– " + fmt(disc);
-    elTip.textContent   = fmt(tip);
-    elTotal.textContent = fmt(total);
-    lastTotal = total;
-
-    const lines = Object.keys(taxBuckets).sort().map(code=>{
-      return `<div class="flex justify-between"><span>Steueranteil ${code}</span><span>${fmt(taxBuckets[code])}</span></div>`;
-    });
-    elTax.innerHTML = lines.length ? `<div class="mt-2 space-y-1">${lines.join("")}</div>` : "";
-
-    btnBook.disabled = cart.size === 0 || total <= 0;
-  }
-
-  // Delegation: Artikel hinzufügen & Cart-Buttons
-  document.addEventListener("click", (e)=>{
-    const addBtn = e.target.closest("button[data-type]");
-    if (addBtn){
-      addItem({
-        id: addBtn.dataset.id,
-        name: addBtn.dataset.name,
-        price: addBtn.dataset.price,
-        tax: addBtn.dataset.tax
+    function recalc() {
+      let html = "";
+      cart.forEach((it, i) => {
+        html += `
+          <div class="d-flex justify-content-between align-items-center py-2 cart-row">
+            <div class="me-2">
+              <div class="fw-semibold">${it.name}</div>
+              <div class="small text-muted">${it.type} • ${fmt(it.price)} CHF</div>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+              <button class="btn btn-sm btn-outline-secondary qty-btn" data-i="${i}" data-op="-">-</button>
+              <span class="px-2">${it.qty}</span>
+              <button class="btn btn-sm btn-outline-secondary qty-btn" data-i="${i}" data-op="+">+</button>
+              <button class="btn btn-sm btn-outline-danger ms-2 rm-btn" data-i="${i}">×</button>
+            </div>
+          </div>`;
       });
+      $("#cart_list").innerHTML = html || '<div class="text-muted">Warenkorb ist leer.</div>';
+
+      const total = cart.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
+      $("#cart_total").textContent = fmt(total);
+
+      $$(".qty-btn").forEach(b => b.addEventListener("click", (e) => {
+        const i = Number(e.currentTarget.dataset.i);
+        const op = e.currentTarget.dataset.op;
+        if (op === "+") cart[i].qty++;
+        if (op === "-" && cart[i].qty > 1) cart[i].qty--;
+        recalc();
+      }));
+      $$(".rm-btn").forEach(b => b.addEventListener("click", (e) => {
+        const i = Number(e.currentTarget.dataset.i);
+        cart.splice(i, 1);
+        recalc();
+      }));
     }
-    const actBtn = e.target.closest("button[data-act]");
-    if (actBtn){
-      const key = actBtn.dataset.key;
-      const item = cart.get(key);
-      if (!item) return;
-      const act = actBtn.dataset.act;
-      if (act === "inc") item.qty += 1;
-      if (act === "dec") item.qty = Math.max(1, item.qty - 1);
-      if (act === "rm")  cart.delete(key);
-      render();
+
+    function addItem(pill) {
+      const type = (pill.dataset.type || "").toLowerCase();
+      const id = Number(pill.dataset.id || 0);
+      const name = pill.dataset.name || "";
+      const price = num(pill.dataset.price);
+      const tax = pill.dataset.tax || "S1";
+      const grp = pill.dataset.grp || (type === "service" ? "DL" : "PR");
+      if (id <= 0) return;
+
+      const found = cart.find(it => it.type === type && it.id === id);
+      if (found) { found.qty++; recalc(); return; }
+
+      cart.push({ type, id, name, price, qty: 1, tax_code: tax, grp: grp });
+      recalc();
     }
-  });
 
-  // Menge manuell
-  document.addEventListener("change", (e)=>{
-    const inp = e.target.closest('input[data-act="qty"]');
-    if (!inp) return;
-    const key = inp.dataset.key;
-    const item = cart.get(key);
-    if (!item) return;
-    const v = parseInt(inp.value || "1", 10);
-    item.qty = Math.max(1, isNaN(v) ? 1 : v);
-    render();
-  });
+    // Sortiment anklickbar
+    $$(".pill").forEach(p => p.addEventListener("click", () => addItem(p)));
 
-  [inDiscAbs, inDiscPct, inTip].forEach(el => el.addEventListener("input", updateTotals));
-  btnClear.addEventListener("click", ()=>{ cart.clear(); render(); });
+    // Kombi Toggle
+    function toggleKombi() {
+      const method = document.querySelector('input[name="pay_method"]:checked')?.value || "bar";
+      $("#kombi_fields").style.display = (method === "kombi") ? "" : "none";
+    }
+    $$('input[name="pay_method"]').forEach(r => r.addEventListener("change", toggleKombi));
+    toggleKombi();
 
-  // >>> BUCHEN <<<
-  btnBook.addEventListener("click", async ()=>{
-    if (cart.size === 0 || lastTotal <= 0) return;
+    // Bezahlen
+    $("#btn_pay").addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      if (!cart.length) { alert("Warenkorb ist leer."); return; }
 
-    // Payload für optionales Backend
-    const items = Array.from(cart.values()).map(x=>({
-      id: x.id, name: x.name, price: x.price, qty: x.qty, tax: x.tax, type: x.id.startsWith("s-") ? "service" : "produkt"
-    }));
-    const payload = {
-      items,
-      discount_abs: parseFloat(inDiscAbs.value || "0"),
-      discount_pct: parseFloat(inDiscPct.value || "0"),
-      tip: parseFloat(inTip.value || "0"),
-      total: lastTotal,
-      payment: [{method:"BAR", amount:lastTotal}]
-    };
+      const total = Number(cart.reduce((s,it)=>s + Number(it.price)*Number(it.qty), 0).toFixed(2));
+      const method = document.querySelector('input[name="pay_method"]:checked')?.value || "bar";
 
-    // Versuche, an /pos/checkout zu posten; wenn nicht vorhanden -> clientseitiger Abschluss
-    let successText = "";
-    try {
-      const res = await fetch("/pos/checkout", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify(payload)
-      });
-      if (res.ok){
-        const data = await res.json().catch(()=>({}));
-        successText = data && data.receipt_number ? `Beleg ${data.receipt_number} gebucht.` : "Buchung erfolgreich.";
+      let amounts = { bar:0, karte:0, twint:0 };
+      if (method === "kombi") {
+        amounts.bar   = Number(num($("#kombi_bar").value).toFixed(2));
+        amounts.karte = Number(num($("#kombi_karte").value).toFixed(2));
+        amounts.twint = Number(num($("#kombi_twint").value).toFixed(2));
+        const sum = Number((amounts.bar + amounts.karte + amounts.twint).toFixed(2));
+        if (sum !== total) {
+          $("#kombi_hint").classList.remove("text-muted");
+          $("#kombi_hint").classList.add("text-danger");
+          $("#kombi_hint").textContent = `Summe (${sum.toFixed(2)} CHF) muss dem Total (${total.toFixed(2)} CHF) entsprechen.`;
+          return;
+        } else {
+          $("#kombi_hint").classList.add("text-muted");
+          $("#kombi_hint").classList.remove("text-danger");
+          $("#kombi_hint").textContent = "Summe muss dem Total entsprechen.";
+        }
+      } else if (method === "bar") {
+        amounts.bar = total;
+      } else if (method === "karte") {
+        amounts.karte = total;
+      } else if (method === "twint") {
+        amounts.twint = total;
       }
-    } catch(e){ /* offline fallback */ }
 
-    if (!successText){
-      successText = "Buchung erfolgreich (Demo).";
-    }
-    msg.textContent = successText;
-    msg.classList.remove("hidden");
+      const items = cart.map(it => ({
+        type: it.type, id: it.id, qty: it.qty,
+        price: Number(it.price),
+        total: Number((it.price * it.qty).toFixed(2)),
+        tax_code: it.tax_code || "S1",
+        grp: it.grp || (it.type === "service" ? "DL" : "PR"),
+        name: it.name || ""
+      }));
 
-    // Warenkorb leeren nach Buchung
-    cart.clear();
-    inDiscAbs.value = "0";
-    inDiscPct.value = "0";
-    inTip.value = "0";
-    render();
+      const payload = { items, payment: { method, amounts } };
 
-    // kurze visuelle Bestätigung
-    setTimeout(()=>{ msg.classList.add("hidden"); }, 3000);
-  });
+      try {
+        const res = await fetch("/pos/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          alert((data && data.error) ? data.error : "Fehler beim Bezahlen.");
+          return;
+        }
 
-  render();
-})();
-</script>
-{% endblock %}
+        // Belegvorschau
+        const html = await fetch("/beleg/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: data.items,
+            total: data.total,
+            payment: data.payment
+          })
+        }).then(r => r.text());
+        const w = window.open("", "_blank");
+        w.document.open(); w.document.write(html); w.document.close();
+
+        // Warenkorb leeren
+        cart.splice(0, cart.length);
+        recalc();
+      } catch (err) {
+        // Fallback: klassischer Form-POST
+        $("#hidden_items").value = JSON.stringify(items);
+        $("#hidden_payment").value = JSON.stringify({ method, amounts });
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "/pos/checkout";
+        form.appendChild($("#hidden_items"));
+        form.appendChild($("#hidden_payment"));
+        document.body.appendChild(form);
+        form.submit();
+      }
+    });
+
+    // initial
+    recalc();
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+(function () {
+  // Globale Warenkorbstruktur
+  window.cartItems = window.cartItems || []; // {type,id,qty,price,total,tax_code,grp,name}
+
+  function q(sel) { return document.querySelector(sel); }
+  function qa(sel) { return document.querySelectorAll(sel); }
+  function byId(id) { return document.getElementById(id); }
+
+  function fmt(n) { return (Number(n || 0).toFixed(2)); }
+  function toNum(v) { return Number((v || "0").toString().replace(",", ".")) || 0; }
+
+  function renderCart() {
+    const list = byId("cart_list");
+    list.innerHTML = "";
+    if (!window.cartItems.length) {
+      list.innerHTML = '<div class="text-muted">Warenkorb ist leer.</div>';
+      byId("cart_total").textContent = "0.00";
+      return;
+    }
+
+    window.cartItems.forEach((it, idx) => {
+      const row = document.createElement("div");
+      row.className = "d-flex align-items-center justify-content-between py-2 cart-item-row";
+      row.innerHTML = `
+        <div class="me-2">
+          <div class="fw-semibold">${it.name}</div>
+          <div class="small text-muted">${it.type} • ${fmt(it.price)} CHF</div>
+        </div>
+        <div class="d-flex align-items-center gap-1">
+          <button class="btn btn-sm btn-outline-secondary cart-qty-btn" data-idx="${idx}" data-op="-">-</button>
+          <span class="px-2">${it.qty}</span>
+          <button class="btn btn-sm btn-outline-secondary cart-qty-btn" data-idx="${idx}" data-op="+">+</button>
+          <button class="btn btn-sm btn-outline-danger ms-2" data-idx="${idx}" data-op="x">×</button>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+
+    // Total
+    const total = window.cartItems.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
+    byId("cart_total").textContent = fmt(total);
+
+    // Qty Buttons
+    qa(".cart-qty-btn").forEach(btn => {
+      btn.addEventListener("click", (ev) => {
+        const i = Number(ev.currentTarget.getAttribute("data-idx"));
+        const op = ev.currentTarget.getAttribute("data-op");
+        const it = window.cartItems[i];
+        if (!it) return;
+        if (op === "+") it.qty++;
+        if (op === "-" && it.qty > 1) it.qty--;
+        renderCart();
+      });
+    });
+    qa(".btn-outline-danger").forEach(btn => {
+      btn.addEventListener("click", (ev) => {
+        const i = Number(ev.currentTarget.getAttribute("data-idx"));
+        window.cartItems.splice(i, 1);
+        renderCart();
+      });
+    });
+  }
+
+  function addFromPill(pill) {
+    const type = (pill.getAttribute("data-type") || "").toLowerCase();
+    const id = Number(pill.getAttribute("data-id") || 0);
+    const name = pill.getAttribute("data-name") || "";
+    const price = toNum(pill.getAttribute("data-price"));
+    const tax_code = pill.getAttribute("data-tax_code") || "S1";
+    const grp = pill.getAttribute("data-grp") || (type === "service" ? "DL" : "PR");
+    if (id <= 0) return;
+
+    // Falls Artikel schon im Korb ist -> qty++
+    const found = window.cartItems.find(it => it.type === type && it.id === id);
+    if (found) { found.qty++; renderCart(); return; }
+
+    window.cartItems.push({
+      type, id, qty: 1, price, total: price, tax_code, grp, name
+    });
+    renderCart();
+  }
+
+  // Sortiment anklickbar machen
+  qa(".item-pill").forEach(pill => {
+    pill.addEventListener("click", () => addFromPill(pill));
+  });
+
+  // Kombi-Felder toggeln
+  function toggleKombi() {
+    const method = document.querySelector('input[name="pay_method"]:checked')?.value || "bar";
+    byId("kombi_fields").style.display = (method === "kombi") ? "" : "none";
+  }
+  qa('input[name="pay_method"]').forEach(r => r.addEventListener("change", toggleKombi));
+  toggleKombi();
+
+  // Bezahl-Button
+  byId("btn_pay").addEventListener("click", async (ev) => {
+    ev.preventDefault();
+
+    if (!window.cartItems.length) {
+      alert("Warenkorb ist leer.");
+      return;
+    }
+    const total = Number(window.cartItems.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0).toFixed(2));
+    const method = document.querySelector('input[name="pay_method"]:checked')?.value || "bar";
+
+    let amounts = { bar: 0, karte: 0, twint: 0 };
+    if (method === "kombi") {
+      amounts.bar = Number(toNum(byId("kombi_bar")).toFixed(2));
+      amounts.karte = Number(toNum(byId("kombi_karte")).toFixed(2));
+      amounts.twint = Number(toNum(byId("kombi_twint")).toFixed(2));
+      const sum = Number((amounts.bar + amounts.karte + amounts.twint).toFixed(2));
+      if (sum !== total) {
+        byId("kombi_hint").classList.remove("text-muted");
+        byId("kombi_hint").classList.add("text-danger");
+        byId("kombi_hint").textContent = `Summe (${sum.toFixed(2)} CHF) muss dem Total (${total.toFixed(2)} CHF) entsprechen.`;
+        return;
+      } else {
+        byId("kombi_hint").classList.add("text-muted");
+        byId("kombi_hint").classList.remove("text-danger");
+        byId("kombi_hint").textContent = "Summe muss dem Total entsprechen.";
+      }
+    } else if (method === "bar") {
+      amounts.bar = total;
+    } else if (method === "karte") {
+      amounts.karte = total;
+    } else if (method === "twint") {
+      amounts.twint = total;
+    }
+
+    // Payload exakt so, wie das Backend es erwartet
+    const items = window.cartItems.map(it => ({
+      type: it.type,
+      id: it.id,
+      qty: it.qty,
+      price: Number(it.price),
+      total: Number((it.price * it.qty).toFixed(2)),
+      tax_code: it.tax_code || "S1",
+      grp: it.grp || (it.type === "service" ? "DL" : "PR"),
+      name: it.name || ""
+    }));
+
+    const payload = { items, payment: { method, amounts } };
+
+    // 1) JSON-POST
+    try {
+      const res = await fetch("/pos/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        alert((data && data.error) ? data.error : "Fehler beim Bezahlen.");
+        return;
+      }
+
+      // Belegvorschau (HTML) öffnen
+      await fetch("/beleg/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: data.items,
+          total: data.total,
+          payment: data.payment
+        })
+      }).then(r => r.text()).then(html => {
+        const w = window.open("", "_blank");
+        w.document.open(); w.document.write(html); w.document.close();
+      });
+
+      // Warenkorb leeren
+      window.cartItems = [];
+      renderCart();
+
+    } catch (e) {
+      // 2) Fallback: Form-POST mit Hidden Inputs
+      byId("hidden_items").value = JSON.stringify(items);
+      byId("hidden_payment").value = JSON.stringify({ method, amounts });
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = "/pos/checkout";
+      form.appendChild(byId("hidden_items"));
+      form.appendChild(byId("hidden_payment"));
+      document.body.appendChild(form);
+      form.submit();
+    }
+  });
+
+  // Erste Darstellung
+  renderCart();
+})();
